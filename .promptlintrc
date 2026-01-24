@@ -1,0 +1,39 @@
+model: gpt-4o
+token_limit: 800
+cost_per_1k_tokens: 0.005
+calls_per_day: 1000000
+display:
+  preview_length: 60
+  context_width: 80
+rules:
+  cost:
+    enabled: true
+  cost_limit:
+    enabled: true
+  politeness_bloat:
+    enabled: true
+    words:
+      - please
+      - kindly
+      - i would appreciate
+      - thank you
+      - be so kind as to
+      - if possible
+    savings_per_hit: 1.5
+  prompt_injection:
+    enabled: true
+    patterns:
+      - ignore previous instructions
+      - system prompt extraction
+      - you are now a [a-zA-Z ]+
+  structure_tags:
+    enabled: true
+    required_tags:
+      - task
+      - context
+      - output_format
+  structure_delimiters:
+    enabled: true
+    delimiters:
+      - "```"
+      - "---"
