@@ -37,3 +37,8 @@ rules:
     delimiters:
       - "```"
       - "---"
+fix:
+  enabled: true
+  politeness_bloat: true
+  prompt_injection: true
+  structure_scaffold: true
