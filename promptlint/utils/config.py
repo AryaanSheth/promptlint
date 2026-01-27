@@ -47,11 +47,20 @@ class PromptlintConfig:
         default_factory=lambda: ["task", "context", "output_format"]
     )
     delimiters: List[str] = field(default_factory=lambda: ["```", "---"])
+    fix_enabled: bool = True
+    fix_rules: Dict[str, bool] = field(
+        default_factory=lambda: {
+            "politeness-bloat": True,
+            "prompt-injection": True,
+            "structure-scaffold": True,
+        }
+    )
 
     @classmethod
     def from_mapping(cls, data: Dict[str, Any]) -> "PromptlintConfig":
         rules_cfg = _get_mapping(data, "rules")
         display_cfg = _get_mapping(data, "display")
+        fix_cfg = _get_mapping(data, "fix")
 
         enabled_rules = cls().enabled_rules.copy()
         for key, value in rules_cfg.items():
@@ -69,6 +78,18 @@ class PromptlintConfig:
         structure_delim_cfg = _get_rule_cfg(
             rules_cfg, "structure_delimiters", "structure-delimiters"
         )
+
+        fix_enabled = fix_cfg.get("enabled")
+        if not isinstance(fix_enabled, bool):
+            fix_enabled = True
+
+        fix_rules = cls().fix_rules.copy()
+        for key, value in fix_cfg.items():
+            if key == "enabled":
+                continue
+            normalized = _normalize_rule_key(key)
+            if isinstance(value, bool):
+                fix_rules[normalized] = value
 
         preview_length = _coerce_int(
             display_cfg.get("preview_length", data.get("preview_length", cls.preview_length)),
@@ -107,6 +128,8 @@ class PromptlintConfig:
             delimiters=_coerce_list(
                 structure_delim_cfg.get("delimiters"), cls().delimiters
             ),
+            fix_enabled=fix_enabled,
+            fix_rules=fix_rules,
         )
 
 
