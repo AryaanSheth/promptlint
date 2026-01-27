@@ -185,6 +185,8 @@ def check_verbosity(text: str, config: PromptlintConfig) -> List[Dict[str, objec
             r"\b(at this point in time)\b",  # use "now"
             r"\b(for the purpose of)\b",  # use "for"
             r"\b(in the event that)\b",  # use "if"
+            r"\b(prior to)\b",  # use "before"
+            r"\b(subsequent to)\b",  # use "after"
         ]
         
         for pattern in redundant_patterns:
