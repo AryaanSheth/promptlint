@@ -81,6 +81,6 @@ fix:
   # Quality fixes
   politeness_bloat: true
   verbosity_redundancy: true
-  actionability_weak_verbs: true
+  # actionability_weak_verbs: true  # Disabled: passive-to-active requires full sentence parsing
   # Structure fixes
   structure_scaffold: true

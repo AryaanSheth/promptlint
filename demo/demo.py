@@ -24,7 +24,7 @@ def main():
     print("=" * 80)
     print()
     print("  PromptLint - Comprehensive Prompt Quality Analyzer".center(80))
-    print("  15+ Quality Checks | 6 Auto-Fix Capabilities".center(80))
+    print("  15+ Quality Checks | 5 Auto-Fix Capabilities".center(80))
     print()
     print("=" * 80)
 
@@ -64,7 +64,7 @@ def main():
     print("\nKey Takeaways:")
     print("  [+] 15+ comprehensive quality checks")
     print("  [+] Security, clarity, specificity, verbosity, and completeness")
-    print("  [+] 6 auto-fix capabilities (30-50% token reduction)")
+    print("  [+] 5 auto-fix capabilities (30-50% token reduction)")
     print("  [+] Line-by-line feedback with precise context")
     print("  [+] JSON output for automation")
     print("  [+] Configurable rules per team/project")

@@ -217,7 +217,7 @@ fix:
   # Quality fixes
   politeness_bloat: true
   verbosity_redundancy: true
-  actionability_weak_verbs: true
+  # actionability_weak_verbs: true  # Detection only, no auto-fix
   # Structure fixes
   structure_scaffold: true
 ```
@@ -272,11 +272,11 @@ Options:
 | 📝 Efficiency | Politeness bloat | ✅ | ✅ |
 | 📝 Efficiency | Redundant phrases | ✅ | ✅ |
 | 📝 Efficiency | Long sentences | ✅ | - |
-| 💪 Actionability | Passive voice | ✅ | ✅ |
+| 💪 Actionability | Passive voice | ✅ | - |
 | 🔄 Consistency | Mixed terminology | ✅ | - |
 | ✅ Completeness | Edge cases | ✅ | - |
 
-**Total: 15+ checks, 6 auto-fixable**
+**Total: 15+ checks, 5 auto-fixable**
 
 ## Roadmap ideas
 - Team presets (security‑first, cost‑first, quality‑first)

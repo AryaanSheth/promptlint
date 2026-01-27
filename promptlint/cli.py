@@ -155,19 +155,15 @@ def _fix_vague_terms(text: str) -> str:
 
 def _strengthen_verbs(text: str) -> str:
     """Convert passive voice to active where possible."""
-    # Simple passive to active conversions
-    patterns = [
-        (r"\bis being used\b", "uses"),
-        (r"\bwas created\b", "created"),
-        (r"\bwere made\b", "made"),
-        (r"\bcan be done\b", "can do"),
-    ]
-    
-    updated = text
-    for pattern, replacement in patterns:
-        updated = re.sub(pattern, replacement, updated, flags=re.IGNORECASE)
-    
-    return updated
+    # NOTE: Passive-to-active conversion requires full sentence parsing
+    # and subject/object relationship understanding. Simple regex replacements
+    # break grammar more than they help (e.g., "is being used" → "uses" 
+    # corrupts "The API is being used by developers" → "The API uses by developers").
+    # 
+    # This function is kept as a no-op to maintain the fix pipeline interface,
+    # but does not perform any transformations. The actionability-weak-verbs
+    # rule still detects passive voice for manual review.
+    return text
 
 
 def _max_severity(results: list[dict]) -> int:

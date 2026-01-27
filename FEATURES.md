@@ -1,7 +1,7 @@
 # PromptLint Feature Summary
 
 ## Overview
-PromptLint has **15+ comprehensive quality checks** with **6 auto-fix capabilities**. The tool provides enterprise-grade prompt analysis for production AI systems.
+PromptLint has **15+ comprehensive quality checks** with **5 auto-fix capabilities**. The tool provides enterprise-grade prompt analysis for production AI systems.
 
 ### 15+ checks
 1. **Cost & Token Analysis** (3 checks)
@@ -33,7 +33,7 @@ PromptLint has **15+ comprehensive quality checks** with **6 auto-fix capabiliti
    - Long sentence detection
 
 7. **Quality: Actionability** (1 check)
-   - Passive voice detection (with auto-fix)
+   - Passive voice detection (manual review recommended)
 
 8. **Quality: Consistency** (1 check)
    - Mixed terminology detection
@@ -43,7 +43,7 @@ PromptLint has **15+ comprehensive quality checks** with **6 auto-fix capabiliti
 
 ## Auto-Fix Capabilities
 
-The `--fix` flag applies 6 different optimizations:
+The `--fix` flag applies 5 different optimizations:
 
 1. **Prompt injection removal**: Strips dangerous patterns
 2. **Politeness bloat**: Removes "please", "kindly", "thank you", etc.
@@ -52,9 +52,10 @@ The `--fix` flag applies 6 different optimizations:
    - "due to the fact that" → "because"
    - "at this point in time" → "now"
    - And more...
-4. **Passive voice strengthening**: Converts to active voice
-5. **Structure scaffolding**: Adds missing XML tags
-6. **Whitespace normalization**: Cleans up formatting
+4. **Structure scaffolding**: Adds missing XML tags
+5. **Whitespace normalization**: Cleans up formatting
+
+Note: Passive voice is detected but not auto-fixed, as grammatically correct conversion requires full sentence parsing.
 
 ## Example Results
 
@@ -100,8 +101,8 @@ fix:
   # Enable/disable auto-fixes
   politeness_bloat: true
   verbosity_redundancy: true
-  actionability_weak_verbs: true
-  # ... and 3 more
+  # actionability_weak_verbs: true  # Detection only, no auto-fix
+  # ... and 2 more
 ```
 
 ## Impact
