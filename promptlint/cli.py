@@ -101,9 +101,12 @@ def _apply_structure_scaffold(text: str, required_tags: list[str]) -> str:
 
     lines: list[str] = []
     lower_text = text.lower()
-    for tag in required_tags:
-        if tag.lower() == "task":
+    content_wrapped = False
+    
+    for tag in missing:
+        if tag.lower() == "task" and not content_wrapped:
             lines.append(f"<task>{text.strip()}</task>")
+            content_wrapped = True
         elif tag.lower() == "context":
             if "context:" in lower_text or "context " in lower_text:
                 lines.append("<context></context>")
@@ -112,6 +115,13 @@ def _apply_structure_scaffold(text: str, required_tags: list[str]) -> str:
                 lines.append("<output_format></output_format>")
         else:
             lines.append(f"<{tag}></{tag}>")
+    
+    if not content_wrapped:
+        scaffold = "\n".join(lines)
+        if scaffold:
+            return f"{scaffold}\n\n{text.strip()}"
+        return text
+    
     return "\n".join(lines)
 
 
