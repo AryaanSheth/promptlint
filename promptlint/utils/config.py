@@ -23,6 +23,14 @@ class PromptlintConfig:
             "structure-delimiters": True,
             "prompt-injection": True,
             "politeness-bloat": True,
+            "clarity-vague-terms": True,
+            "specificity-examples": True,
+            "specificity-constraints": True,
+            "verbosity-sentence-length": True,
+            "verbosity-redundancy": True,
+            "actionability-weak-verbs": True,
+            "consistency-terminology": True,
+            "completeness-edge-cases": True,
         }
     )
     politeness_words: List[str] = field(
@@ -53,6 +61,8 @@ class PromptlintConfig:
             "politeness-bloat": True,
             "prompt-injection": True,
             "structure-scaffold": True,
+            "verbosity-redundancy": True,
+            "actionability-weak-verbs": True,
         }
     )
 

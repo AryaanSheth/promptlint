@@ -1,0 +1,28 @@
+<task>
+Write a Python function named calculate_fibonacci that returns the nth Fibonacci number.
+</task>
+
+<context>
+This function will be used in a mathematical computation library. Users will provide positive integers as input.
+</context>
+
+<output_format>
+Return a single Python function with:
+- Type hints for parameters and return value
+- A docstring explaining the function
+- Error handling for negative inputs and non-integers
+- Must handle n=0 (return 0) and n=1 (return 1) as base cases
+- Maximum input: n <= 100
+</output_format>
+
+---
+
+Example usage:
+```python
+result = calculate_fibonacci(10)  # Should return 55
+```
+
+Edge cases to handle:
+- Negative numbers: raise ValueError
+- Non-integer inputs: raise TypeError
+- n > 100: raise ValueError with message about maximum limit
