@@ -1,4 +1,20 @@
+# Core dependencies
 typer[all]==0.9.0
 pyyaml==6.0.1
 tiktoken==0.5.2
 rich==13.7.0
+
+# Hotkey service dependencies (optional - for Cursor integration)
+keyboard>=0.13.5           # Global hotkey registration
+pyautogui>=0.9.53          # Keyboard/mouse automation for text capture
+pyperclip>=1.8.2           # Cross-platform clipboard access
+plyer>=2.1.0               # Cross-platform notifications
+pystray>=0.19.4            # System tray icon support
+Pillow>=10.0.0             # Image support for tray icons
+
+# Platform-specific dependencies (install as needed)
+# Windows:
+#   pywin32>=305           # Windows API access
+#   psutil>=5.9.0          # Process utilities
+# macOS:
+#   pyobjc-framework-Cocoa>=9.0  # macOS native APIs

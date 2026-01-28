@@ -1,0 +1,12 @@
+{
+  "hotkey": "ctrl+shift+l",
+  "auto_copy": true,
+  "show_info_level": true,
+  "notification_duration": 10,
+  "promptlint_path": "python -m promptlint.cli",
+  "verify_cursor_active": true,
+  "min_text_length": 5,
+  "max_text_length": 10000,
+  "copy_delay_ms": 100,
+  "selection_delay_ms": 50
+}
