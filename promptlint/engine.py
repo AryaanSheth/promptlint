@@ -1,7 +1,15 @@
 import re
 
 from .rules.cost import check_tokens
-from .rules.quality import check_structure
+from .rules.quality import (
+    check_structure,
+    check_clarity,
+    check_specificity,
+    check_verbosity,
+    check_actionability,
+    check_consistency,
+    check_completeness,
+)
 from .rules.security import check_injection
 
 
@@ -11,9 +19,22 @@ class LintEngine:
 
     def analyze(self, text: str):
         results = []
+        # Cost and token analysis
         results.extend(check_tokens(text, self.config))
+        
+        # Structure checks
         results.extend(check_structure(text, self.config))
+        
+        # Security checks
         results.extend(check_injection(text, self.config))
+        
+        # Advanced quality checks
+        results.extend(check_clarity(text, self.config))
+        results.extend(check_specificity(text, self.config))
+        results.extend(check_verbosity(text, self.config))
+        results.extend(check_actionability(text, self.config))
+        results.extend(check_consistency(text, self.config))
+        results.extend(check_completeness(text, self.config))
 
         if not self.config.enabled_rules.get("politeness-bloat", True):
             return results
@@ -23,6 +44,9 @@ class LintEngine:
         bloat_matches = list(re.finditer(bloat_regex, text, re.IGNORECASE))
 
         if bloat_matches:
+            # Determine severity based on team preference
+            level = "INFO" if self.config.allow_politeness else "WARN"
+            
             for match in bloat_matches:
                 line = text.count("\n", 0, match.start()) + 1
                 line_start = text.rfind("\n", 0, match.start()) + 1
@@ -50,15 +74,19 @@ class LintEngine:
                     caret_pos = column
 
                 context = f"{display_line}\n{' ' * caret_pos}^"
+                
+                # Build message based on team preference
+                if self.config.allow_politeness:
+                    message = f"Optional: Remove '{match.group(0)}' to save ~{self.config.politeness_savings_per_hit} tokens."
+                else:
+                    message = f"Consider removing '{match.group(0)}' (adds {self.config.politeness_savings_per_hit} tokens without semantic value)."
+                
                 results.append(
                     {
-                        "level": "WARN",
+                        "level": level,
                         "rule": "politeness-bloat",
-                        "message": (
-                            f"Politeness filler detected: '{match.group(0)}'. "
-                            "AI doesn't need manners."
-                        ),
-                    "savings": self.config.politeness_savings_per_hit,
+                        "message": message,
+                        "savings": self.config.politeness_savings_per_hit,
                         "line": line,
                         "context": context,
                     }

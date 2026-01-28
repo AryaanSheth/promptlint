@@ -19,10 +19,17 @@ class PromptlintConfig:
         default_factory=lambda: {
             "cost": True,
             "cost-limit": True,
-            "structure-tags": True,
-            "structure-delimiters": True,
+            "structure-sections": True,
             "prompt-injection": True,
             "politeness-bloat": True,
+            "clarity-vague-terms": True,
+            "specificity-examples": True,
+            "specificity-constraints": True,
+            "verbosity-sentence-length": True,
+            "verbosity-redundancy": True,
+            "actionability-weak-verbs": True,
+            "consistency-terminology": True,
+            "completeness-edge-cases": True,
         }
     )
     politeness_words: List[str] = field(
@@ -36,6 +43,7 @@ class PromptlintConfig:
         ]
     )
     politeness_savings_per_hit: float = 1.5
+    allow_politeness: bool = False  # If True, politeness detection is INFO-level only
     injection_patterns: List[str] = field(
         default_factory=lambda: [
             "ignore previous instructions",
@@ -43,19 +51,34 @@ class PromptlintConfig:
             "you are now a [a-zA-Z ]+",
         ]
     )
+    structure_style: str = "auto"  # "auto", "xml", "headings", "markdown", "none"
     required_tags: List[str] = field(
         default_factory=lambda: ["task", "context", "output_format"]
     )
     delimiters: List[str] = field(default_factory=lambda: ["```", "---"])
+    fix_enabled: bool = True
+    fix_rules: Dict[str, bool] = field(
+        default_factory=lambda: {
+            "politeness-bloat": True,
+            "prompt-injection": True,
+            "structure-scaffold": True,
+            "verbosity-redundancy": True,
+            "actionability-weak-verbs": True,
+        }
+    )
 
     @classmethod
     def from_mapping(cls, data: Dict[str, Any]) -> "PromptlintConfig":
         rules_cfg = _get_mapping(data, "rules")
         display_cfg = _get_mapping(data, "display")
+        fix_cfg = _get_mapping(data, "fix")
 
         enabled_rules = cls().enabled_rules.copy()
         for key, value in rules_cfg.items():
             normalized = _normalize_rule_key(key)
+            # Backward compatibility: map old structure rules to new one
+            if normalized in ("structure-tags", "structure-delimiters"):
+                normalized = "structure-sections"
             if isinstance(value, dict):
                 enabled = value.get("enabled")
                 if isinstance(enabled, bool):
@@ -69,6 +92,18 @@ class PromptlintConfig:
         structure_delim_cfg = _get_rule_cfg(
             rules_cfg, "structure_delimiters", "structure-delimiters"
         )
+
+        fix_enabled = fix_cfg.get("enabled")
+        if not isinstance(fix_enabled, bool):
+            fix_enabled = True
+
+        fix_rules = cls().fix_rules.copy()
+        for key, value in fix_cfg.items():
+            if key == "enabled":
+                continue
+            normalized = _normalize_rule_key(key)
+            if isinstance(value, bool):
+                fix_rules[normalized] = value
 
         preview_length = _coerce_int(
             display_cfg.get("preview_length", data.get("preview_length", cls.preview_length)),
@@ -89,6 +124,7 @@ class PromptlintConfig:
             preview_length=preview_length,
             context_width=context_width,
             enabled_rules=enabled_rules,
+            structure_style=str(data.get("structure_style", cls.structure_style)),
             politeness_words=_coerce_list(
                 politeness_cfg.get("words"), cls().politeness_words
             ),
@@ -97,6 +133,10 @@ class PromptlintConfig:
                     "savings_per_hit", cls.politeness_savings_per_hit
                 ),
                 cls.politeness_savings_per_hit,
+            ),
+            allow_politeness=bool(
+                politeness_cfg.get("allow_politeness", 
+                data.get("allow_politeness", cls.allow_politeness))
             ),
             injection_patterns=_coerce_list(
                 injection_cfg.get("patterns"), cls().injection_patterns
@@ -107,6 +147,8 @@ class PromptlintConfig:
             delimiters=_coerce_list(
                 structure_delim_cfg.get("delimiters"), cls().delimiters
             ),
+            fix_enabled=fix_enabled,
+            fix_rules=fix_rules,
         )
 
 
