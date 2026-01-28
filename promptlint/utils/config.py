@@ -19,8 +19,7 @@ class PromptlintConfig:
         default_factory=lambda: {
             "cost": True,
             "cost-limit": True,
-            "structure-tags": True,
-            "structure-delimiters": True,
+            "structure-sections": True,
             "prompt-injection": True,
             "politeness-bloat": True,
             "clarity-vague-terms": True,
@@ -44,6 +43,7 @@ class PromptlintConfig:
         ]
     )
     politeness_savings_per_hit: float = 1.5
+    allow_politeness: bool = False  # If True, politeness detection is INFO-level only
     injection_patterns: List[str] = field(
         default_factory=lambda: [
             "ignore previous instructions",
@@ -51,6 +51,7 @@ class PromptlintConfig:
             "you are now a [a-zA-Z ]+",
         ]
     )
+    structure_style: str = "auto"  # "auto", "xml", "headings", "markdown", "none"
     required_tags: List[str] = field(
         default_factory=lambda: ["task", "context", "output_format"]
     )
@@ -75,6 +76,9 @@ class PromptlintConfig:
         enabled_rules = cls().enabled_rules.copy()
         for key, value in rules_cfg.items():
             normalized = _normalize_rule_key(key)
+            # Backward compatibility: map old structure rules to new one
+            if normalized in ("structure-tags", "structure-delimiters"):
+                normalized = "structure-sections"
             if isinstance(value, dict):
                 enabled = value.get("enabled")
                 if isinstance(enabled, bool):
@@ -120,6 +124,7 @@ class PromptlintConfig:
             preview_length=preview_length,
             context_width=context_width,
             enabled_rules=enabled_rules,
+            structure_style=str(data.get("structure_style", cls.structure_style)),
             politeness_words=_coerce_list(
                 politeness_cfg.get("words"), cls().politeness_words
             ),
@@ -128,6 +133,10 @@ class PromptlintConfig:
                     "savings_per_hit", cls.politeness_savings_per_hit
                 ),
                 cls.politeness_savings_per_hit,
+            ),
+            allow_politeness=bool(
+                politeness_cfg.get("allow_politeness", 
+                data.get("allow_politeness", cls.allow_politeness))
             ),
             injection_patterns=_coerce_list(
                 injection_cfg.get("patterns"), cls().injection_patterns

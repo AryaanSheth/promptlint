@@ -2,6 +2,11 @@ model: gpt-4o
 token_limit: 800
 cost_per_1k_tokens: 0.005
 calls_per_day: 1000000
+
+# Structure style preference (for auto-fix scaffold)
+# Options: "auto", "xml", "headings", "markdown", "none"
+structure_style: auto
+
 display:
   preview_length: 60
   context_width: 80
@@ -23,17 +28,10 @@ rules:
       - you are now a [a-zA-Z ]+
 
   # Structure & Organization
-  structure_tags:
+  structure_sections:
     enabled: true
-    required_tags:
-      - task
-      - context
-      - output_format
-  structure_delimiters:
-    enabled: true
-    delimiters:
-      - "```"
-      - "---"
+    # Detects ANY clear structure (XML tags, headings, markdown sections, JSON, numbered lists)
+    # No specific format required - just checks that prompt has organization
 
   # Quality: Clarity
   clarity_vague_terms:
@@ -48,6 +46,9 @@ rules:
   # Quality: Verbosity & Efficiency
   politeness_bloat:
     enabled: true
+    # Set allow_politeness: true if your team prefers polite tone (makes this INFO-level)
+    # Set allow_politeness: false for token optimization focus (makes this WARN-level)
+    allow_politeness: false
     words:
       - please
       - kindly
