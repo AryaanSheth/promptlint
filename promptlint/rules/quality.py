@@ -44,41 +44,46 @@ def _line_context(text: str, index: int, width: int) -> str:
 
 def check_structure(text: str, config: PromptlintConfig) -> List[Dict[str, object]]:
     results: List[Dict[str, object]] = []
-
-    required_tags = config.required_tags
-    missing_tags = [
-        tag for tag in required_tags if not re.search(rf"<{tag}>", text, re.IGNORECASE)
-    ]
-
-    if missing_tags and config.enabled_rules.get("structure-tags", True):
+    
+    if not config.enabled_rules.get("structure-sections", True):
+        return results
+    
+    # Detect various structure formats
+    has_xml_tags = bool(re.search(r"<\w+>", text))
+    has_headings = bool(re.search(r"(?:^|\n)(?:Task|Context|Output|Goal|Requirements|Instructions):\s", text, re.IGNORECASE))
+    has_markdown_headers = bool(re.search(r"(?:^|\n)#{1,6}\s+\w+", text))
+    has_json_structure = bool(re.search(r'[{\[][\s\S]*[}\]]', text)) and ('"' in text or "'" in text)
+    has_delimiters = bool(re.search(r"```|^---\s*$", text, re.MULTILINE))
+    has_numbered_sections = bool(re.search(r"(?:^|\n)\d+\.\s+\w+", text))
+    
+    # Check if ANY structure is present
+    has_any_structure = (
+        has_xml_tags or 
+        has_headings or 
+        has_markdown_headers or 
+        has_json_structure or 
+        has_delimiters or
+        has_numbered_sections
+    )
+    
+    # Only warn if no structure is detected
+    if not has_any_structure:
         results.append(
             {
                 "level": "WARN",
-                "rule": "structure-tags",
-                "message": (
-                    "Missing XML tags: "
-                    + ", ".join(f"<{tag}>" for tag in missing_tags)
-                ),
+                "rule": "structure-sections",
+                "message": "No explicit sections detected (Task/Context/Output).",
                 "line": "-",
                 "context": _preview(text, config.preview_length),
             }
         )
-
-    delimiters = config.delimiters
-    has_backticks = "```" in text and "```" in delimiters
-    has_dashes = (
-        re.search(r"^---\s*$", text, re.MULTILINE) is not None and "---" in delimiters
-    )
-    if (
-        config.enabled_rules.get("structure-delimiters", True)
-        and delimiters
-        and not (has_backticks or has_dashes)
-    ):
+        
+        # Provide recommendations
         results.append(
             {
-                "level": "WARN",
-                "rule": "structure-delimiters",
-                "message": f"No delimiters found ({', '.join(delimiters)}).",
+                "level": "INFO",
+                "rule": "structure-recommendations",
+                "message": "Recommended templates: headings (Task:, Context:, Output:) / XML tags (<task>) / Markdown (## sections).",
                 "line": "-",
                 "context": _preview(text, config.preview_length),
             }

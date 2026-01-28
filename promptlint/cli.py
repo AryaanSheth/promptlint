@@ -48,15 +48,100 @@ def _render_findings(results: list[dict]) -> None:
             console.print(context)
 
 
-def _render_dashboard(tokens: int, optimized_tokens: float, annual_cost: float) -> None:
-    monthly_waste = annual_cost / 12
-    billion_status = (annual_cost / 1_000_000_000) * 100
+def _render_dashboard(
+    tokens: int, 
+    optimized_tokens: float, 
+    cost_per_1k: float, 
+    calls_per_day: int
+) -> None:
+    optimized_tokens = int(max(optimized_tokens, 0))
+    tokens_saved = tokens - optimized_tokens
+    reduction_pct = (tokens_saved / tokens * 100) if tokens > 0 else 0
+    
+    current_cost_per_call = (tokens / 1000.0) * cost_per_1k
+    optimized_cost_per_call = (optimized_tokens / 1000.0) * cost_per_1k
+    savings_per_call = current_cost_per_call - optimized_cost_per_call
 
     console.print("Savings Dashboard")
     console.print(f"Current Tokens: {tokens}")
-    console.print(f"Optimized Tokens: {int(max(optimized_tokens, 0))}")
-    console.print(f"Monthly Waste: ${monthly_waste:,.0f}")
-    console.print(f"Billion Dollar Status: {billion_status:.4f}% of $1B saved")
+    console.print(f"Optimized Tokens: {optimized_tokens} ({reduction_pct:.1f}% reduction)")
+    console.print(f"Savings per Call: ~${savings_per_call:.4f}")
+    
+    # Only show volume projections if calls_per_day is reasonable (< 100k)
+    if calls_per_day < 100_000:
+        daily_savings = savings_per_call * calls_per_day
+        monthly_savings = daily_savings * 30
+        annual_savings = daily_savings * 365
+        console.print(f"Monthly Savings: ~${monthly_savings:,.2f} at {calls_per_day:,} calls/day")
+        console.print(f"Annual Savings: ~${annual_savings:,.2f}")
+
+
+def _normalize_spacing_and_punctuation(text: str) -> str:
+    """Normalize spacing and punctuation after text modifications."""
+    updated = text
+    
+    # Fix multiple spaces to single space
+    updated = re.sub(r"[ \t]{2,}", " ", updated)
+    
+    # Fix spacing before punctuation (remove space before punctuation)
+    updated = re.sub(r"\s+([,.;:!?])", r"\1", updated)
+    
+    # Fix mixed punctuation marks - keep only the strongest/most meaningful one
+    # Priority: ? > ! > . > ; > , > :
+    updated = re.sub(r"[,.;:!?]*\?[,.;:!?]*", "?", updated)  # Keep question mark
+    updated = re.sub(r"[,.;:!]*![,.;:!]*", "!", updated)  # Keep exclamation
+    updated = re.sub(r"[,.;:]*\.[,.;:]*", ".", updated)  # Keep period
+    
+    # Fix orphaned punctuation combinations (e.g., "word,.!" -> "word.")
+    # Keep only the most significant punctuation mark in a sequence
+    updated = re.sub(r"[,;:]+([.!?])", r"\1", updated)  # Remove weak punctuation before strong
+    updated = re.sub(r"([.!?])[,;:]+", r"\1", updated)  # Remove weak punctuation after strong
+    updated = re.sub(r"[,;:]{2,}", ",", updated)  # Multiple weak punctuation -> single comma
+    
+    # Fix multiple punctuation marks of same type
+    updated = re.sub(r"[.]{2,}", ".", updated)  # Multiple periods
+    updated = re.sub(r"[,]{2,}", ",", updated)  # Multiple commas
+    updated = re.sub(r"[!]{2,}", "!", updated)  # Multiple exclamations
+    updated = re.sub(r"[?]{2,}", "?", updated)  # Multiple questions
+    
+    # Fix orphaned punctuation at the start of a sentence (e.g., ". sentence" or ", sentence")
+    updated = re.sub(r"(?:^|\n)\s*[,;:.!?]\s*", r"\n", updated)
+    
+    # Fix orphaned conjunctions before punctuation (e.g., "word and.")
+    updated = re.sub(r"\s+(?:and|or|but)\s*([.!?,;:])", r"\1", updated, flags=re.IGNORECASE)
+    
+    # Fix orphaned prepositions before punctuation (e.g., "word for.")
+    updated = re.sub(r"\s+(?:for|to|from|with|at|by|in|on)\s*([.!?,;:])", r"\1", updated, flags=re.IGNORECASE)
+    
+    # Fix multiple consecutive punctuation with space (e.g., "word. . .")
+    updated = re.sub(r"([.!?])\s*\1+", r"\1", updated)
+    
+    # Fix comma/period at start of line or after another punctuation
+    updated = re.sub(r"([.!?])\s*,", r"\1", updated)  # Remove comma after sentence-ending punctuation
+    
+    # Capitalize first letter of sentences after removing leading words
+    # Handle start of text
+    if updated and updated[0].islower():
+        updated = updated[0].upper() + updated[1:]
+    
+    # Capitalize after sentence-ending punctuation
+    def capitalize_after_punct(match):
+        return match.group(1) + " " + match.group(2).upper()
+    
+    updated = re.sub(r"([.!?])\s+([a-z])", capitalize_after_punct, updated)
+    
+    # Fix multiple newlines
+    updated = re.sub(r"\n{3,}", "\n\n", updated)
+    
+    # Clean up lines that are only punctuation or whitespace
+    lines = []
+    for line in updated.splitlines():
+        stripped = line.strip()
+        # Skip empty lines and lines that are only punctuation/whitespace
+        if stripped and not re.fullmatch(r"[.\-_,;:!?\s]+", stripped):
+            lines.append(line)
+    
+    return "\n".join(lines)
 
 
 def _apply_politeness_fix(text: str, words: list[str]) -> str:
@@ -65,28 +150,49 @@ def _apply_politeness_fix(text: str, words: list[str]) -> str:
     escaped = [re.escape(word) for word in words]
     pattern = r"(?<!\w)(?:" + "|".join(escaped) + r")(?!\w)"
     updated = re.sub(pattern, "", text, flags=re.IGNORECASE)
-    updated = re.sub(r"[ \t]{2,}", " ", updated)
-    updated = re.sub(r"\s+([,.;:!?])", r"\1", updated)
-    updated = re.sub(r"\n{3,}", "\n\n", updated)
+    
+    # Remove common politeness phrase fragments
+    fragment_patterns = [
+        r"\b(?:for|to)\s+(?:your|the)\s+(?:help|time|effort|assistance|consideration)\s*[.!?]*",
+        r"\b(?:i\s+would\s+appreciate|would\s+appreciate)\s*[.!?]*",
+        r"\b(?:be\s+so\s+kind\s+as\s+to)\s*[.!?]*",
+        r"\b(?:for)\s+(?:implementing|doing|creating|making|writing)\s+(?:this|that)\s*",
+        r"\b(?:very\s+much|so\s+much)\s*[.!?,;:]*",
+    ]
+    for fragment in fragment_patterns:
+        updated = re.sub(fragment, "", updated, flags=re.IGNORECASE)
+    
+    # Clean up punctuation and spacing issues
+    updated = _normalize_spacing_and_punctuation(updated)
     return updated.strip()
 
 def _remove_injection_content(text: str, patterns: list[str]) -> str:
     if not patterns:
         return text
-    updated = text
-    for pattern in patterns:
-        updated = re.sub(pattern, "", updated, flags=re.IGNORECASE)
+    
+    lines = text.splitlines()
+    filtered_lines = []
+    
+    for line in lines:
+        # Check if this line contains any injection pattern
+        contains_injection = False
+        for pattern in patterns:
+            if re.search(pattern, line, flags=re.IGNORECASE):
+                contains_injection = True
+                break
+        
+        # Only keep lines that don't contain injection patterns
+        if not contains_injection:
+            filtered_lines.append(line)
+    
+    updated = "\n".join(filtered_lines)
+    
+    # Remove orphaned conjunctions before punctuation
     updated = re.sub(r"\band\b(?=\s*[.!,?]|$)", "", updated, flags=re.IGNORECASE)
-    updated = re.sub(r"[ \t]{2,}", " ", updated)
-    updated = re.sub(r"\s+([,.;:!?])", r"\1", updated)
-    updated = re.sub(r"\n{3,}", "\n\n", updated)
-    updated = re.sub(r"[.]{2,}", ".", updated)
-    lines = [
-        line
-        for line in updated.splitlines()
-        if not re.fullmatch(r"[.\-_,;:!?\s]*", line)
-    ]
-    return "\n".join(lines).strip()
+    
+    # Clean up punctuation and spacing issues
+    updated = _normalize_spacing_and_punctuation(updated)
+    return updated.strip()
 
 
 def _apply_structure_scaffold(text: str, required_tags: list[str]) -> str:
@@ -141,8 +247,8 @@ def _fix_redundancy(text: str) -> str:
     for pattern, replacement in replacements:
         updated = re.sub(pattern, replacement, updated, flags=re.IGNORECASE)
     
-    # Clean up extra spaces
-    updated = re.sub(r"[ \t]{2,}", " ", updated)
+    # Clean up punctuation and spacing issues
+    updated = _normalize_spacing_and_punctuation(updated)
     return updated
 
 
@@ -226,13 +332,27 @@ def _run_lint(
                 )
 
     if output_format.lower() == "json":
+        opt_tokens = int(max(optimized_tokens, 0))
+        tokens_saved = tokens - opt_tokens
+        reduction_pct = (tokens_saved / tokens * 100) if tokens > 0 else 0
+        current_cost_per_call = (tokens / 1000.0) * config_data.cost_per_1k_tokens
+        optimized_cost_per_call = (opt_tokens / 1000.0) * config_data.cost_per_1k_tokens
+        savings_per_call = current_cost_per_call - optimized_cost_per_call
+        
         dashboard = {
             "current_tokens": tokens,
-            "optimized_tokens": int(max(optimized_tokens, 0)),
-            "annual_cost": annual_cost,
-            "monthly_waste": annual_cost / 12,
-            "billion_dollar_status": (annual_cost / 1_000_000_000) * 100,
+            "optimized_tokens": opt_tokens,
+            "tokens_saved": tokens_saved,
+            "reduction_percentage": round(reduction_pct, 1),
+            "savings_per_call": round(savings_per_call, 6),
         }
+        
+        if config_data.calls_per_day < 100_000:
+            daily_savings = savings_per_call * config_data.calls_per_day
+            dashboard["monthly_savings"] = round(daily_savings * 30, 2)
+            dashboard["annual_savings"] = round(daily_savings * 365, 2)
+            dashboard["calls_per_day"] = config_data.calls_per_day
+        
         payload = {
             "findings": results,
             "optimized_prompt": optimized_prompt,
@@ -244,7 +364,12 @@ def _run_lint(
         _render_findings(results)
         if show_dashboard:
             console.print("")
-            _render_dashboard(tokens, optimized_tokens, annual_cost)
+            _render_dashboard(
+                tokens, 
+                optimized_tokens, 
+                config_data.cost_per_1k_tokens, 
+                config_data.calls_per_day
+            )
         if optimized_prompt is not None:
             console.print("Optimized Prompt")
             console.print(optimized_prompt)
