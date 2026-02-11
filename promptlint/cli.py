@@ -16,6 +16,7 @@ from .utils.config import load_config
 console = Console()
 
 
+
 def _read_input(text: str, file_path: Optional[Path]) -> str:
     if text.strip():
         return text.replace("\\n", "\n")
@@ -359,7 +360,8 @@ def _run_lint(
         }
         if show_dashboard:
             payload["dashboard"] = dashboard
-        console.print(json.dumps(payload, indent=2))
+        # Use regular print for JSON to avoid Rich formatting/control characters
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
     else:
         _render_findings(results)
         if show_dashboard:

@@ -27,11 +27,23 @@ IS_MACOS = PLATFORM == "darwin"
 IS_LINUX = PLATFORM == "linux"
 
 # Conditional imports based on platform
-try:
-    import keyboard
-    KEYBOARD_AVAILABLE = True
-except ImportError:
-    KEYBOARD_AVAILABLE = False
+# Prefer pynput on macOS as it works with accessibility permissions
+PYNPUT_AVAILABLE = False
+KEYBOARD_AVAILABLE = False
+
+if IS_MACOS:
+    try:
+        from pynput import keyboard as pynput_keyboard
+        PYNPUT_AVAILABLE = True
+    except ImportError:
+        pass
+
+if not PYNPUT_AVAILABLE:
+    try:
+        import keyboard
+        KEYBOARD_AVAILABLE = True
+    except ImportError:
+        pass
 
 try:
     import pyautogui
@@ -335,10 +347,95 @@ class PromptLintService:
     
     def register_hotkey(self) -> bool:
         """Register the global hotkey."""
-        if not KEYBOARD_AVAILABLE:
-            self._notify_error("keyboard library not available. Install with: pip install keyboard")
+        if PYNPUT_AVAILABLE:
+            return self._register_hotkey_pynput()
+        elif KEYBOARD_AVAILABLE:
+            return self._register_hotkey_keyboard()
+        else:
+            self._notify_error("No hotkey library available. Install with: pip install pynput")
             return False
-        
+    
+    def _register_hotkey_pynput(self) -> bool:
+        """Register hotkey using pynput (preferred on macOS)."""
+        try:
+            # Parse hotkey string (e.g., "ctrl+shift+l")
+            hotkey_parts = self.config.hotkey.lower().split("+")
+            
+            # Map modifier names to pynput keys
+            modifier_map = {
+                "ctrl": pynput_keyboard.Key.ctrl,
+                "control": pynput_keyboard.Key.ctrl,
+                "shift": pynput_keyboard.Key.shift,
+                "alt": pynput_keyboard.Key.alt,
+                "option": pynput_keyboard.Key.alt,
+                "cmd": pynput_keyboard.Key.cmd,
+                "command": pynput_keyboard.Key.cmd,
+            }
+            
+            self._pynput_modifiers = set()
+            self._pynput_key = None
+            
+            for part in hotkey_parts:
+                part = part.strip()
+                if part in modifier_map:
+                    self._pynput_modifiers.add(modifier_map[part])
+                else:
+                    # It's the main key
+                    self._pynput_key = part
+            
+            self._pressed_modifiers = set()
+            
+            def on_press(key):
+                try:
+                    # Check if it's a modifier
+                    if hasattr(key, 'name') or key in self._pynput_modifiers:
+                        if key in self._pynput_modifiers:
+                            self._pressed_modifiers.add(key)
+                        # Also handle Key.ctrl_l, Key.ctrl_r etc.
+                        for mod in self._pynput_modifiers:
+                            if hasattr(key, 'name') and mod.name in str(key):
+                                self._pressed_modifiers.add(mod)
+                    
+                    # Check if it's our target key
+                    key_char = None
+                    if hasattr(key, 'char') and key.char:
+                        key_char = key.char.lower()
+                    elif hasattr(key, 'name'):
+                        key_char = key.name.lower()
+                    
+                    if key_char == self._pynput_key:
+                        # Check if all modifiers are pressed
+                        if self._pynput_modifiers.issubset(self._pressed_modifiers):
+                            self._on_hotkey_pressed()
+                except Exception:
+                    pass
+            
+            def on_release(key):
+                try:
+                    if key in self._pressed_modifiers:
+                        self._pressed_modifiers.discard(key)
+                    # Handle ctrl_l, ctrl_r, etc.
+                    for mod in list(self._pressed_modifiers):
+                        if hasattr(key, 'name') and mod.name in str(key):
+                            self._pressed_modifiers.discard(mod)
+                except Exception:
+                    pass
+            
+            self._pynput_listener = pynput_keyboard.Listener(
+                on_press=on_press,
+                on_release=on_release
+            )
+            self._pynput_listener.start()
+            self._hotkey_registered = True
+            self._notify_status(f"Hotkey registered: {self.config.hotkey}")
+            return True
+            
+        except Exception as e:
+            self._notify_error(f"Failed to register hotkey with pynput: {e}")
+            return False
+    
+    def _register_hotkey_keyboard(self) -> bool:
+        """Register hotkey using keyboard library."""
         try:
             keyboard.add_hotkey(
                 self.config.hotkey,
@@ -354,7 +451,13 @@ class PromptLintService:
     
     def unregister_hotkey(self) -> None:
         """Unregister the global hotkey."""
-        if KEYBOARD_AVAILABLE and self._hotkey_registered:
+        if PYNPUT_AVAILABLE and hasattr(self, '_pynput_listener'):
+            try:
+                self._pynput_listener.stop()
+                self._hotkey_registered = False
+            except Exception:
+                pass
+        elif KEYBOARD_AVAILABLE and self._hotkey_registered:
             try:
                 keyboard.remove_hotkey(self.config.hotkey)
                 self._hotkey_registered = False
@@ -550,7 +653,11 @@ class PromptLintService:
         print("Press Ctrl+C to exit")
         
         try:
-            if KEYBOARD_AVAILABLE:
+            if PYNPUT_AVAILABLE and hasattr(self, '_pynput_listener'):
+                # pynput listener runs in background, just wait
+                while self._running:
+                    time.sleep(0.5)
+            elif KEYBOARD_AVAILABLE:
                 keyboard.wait()
             else:
                 while self._running:
@@ -565,8 +672,9 @@ def check_dependencies() -> list[str]:
     """Check for missing dependencies."""
     missing = []
     
-    if not KEYBOARD_AVAILABLE:
-        missing.append("keyboard")
+    # Need either pynput or keyboard for hotkey support
+    if not PYNPUT_AVAILABLE and not KEYBOARD_AVAILABLE:
+        missing.append("pynput")  # Prefer pynput, especially on macOS
     if not PYAUTOGUI_AVAILABLE:
         missing.append("pyautogui")
     if not PYPERCLIP_AVAILABLE:

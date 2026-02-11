@@ -1,0 +1,138 @@
+{
+  "name": "promptlint",
+  "displayName": "PromptLint",
+  "description": "Analyze and optimize AI prompts for quality, clarity, and cost-efficiency BEFORE sending to LLMs",
+  "version": "1.0.0",
+  "publisher": "promptlint",
+  "icon": "icon.png",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Linters",
+    "Machine Learning",
+    "Other"
+  ],
+  "keywords": [
+    "prompt",
+    "ai",
+    "llm",
+    "cursor",
+    "linter",
+    "optimization"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "promptlint.analyzeSelection",
+        "title": "PromptLint: Analyze Selection",
+        "icon": "$(check)"
+      },
+      {
+        "command": "promptlint.analyzeAndReplace",
+        "title": "PromptLint: Optimize & Replace",
+        "icon": "$(zap)"
+      },
+      {
+        "command": "promptlint.showDiff",
+        "title": "PromptLint: Show Optimized Diff",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "promptlint.toggleStatusBar",
+        "title": "PromptLint: Toggle Status Bar"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "promptlint.analyzeSelection",
+        "key": "cmd+alt+l",
+        "mac": "cmd+alt+l",
+        "win": "ctrl+alt+l",
+        "linux": "ctrl+alt+l",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "promptlint.analyzeAndReplace",
+        "key": "cmd+shift+alt+l",
+        "mac": "cmd+shift+alt+l",
+        "win": "ctrl+shift+alt+l",
+        "linux": "ctrl+shift+alt+l",
+        "when": "editorTextFocus"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "when": "editorHasSelection",
+          "command": "promptlint.analyzeSelection",
+          "group": "promptlint@1"
+        },
+        {
+          "when": "editorHasSelection",
+          "command": "promptlint.analyzeAndReplace",
+          "group": "promptlint@2"
+        },
+        {
+          "when": "editorHasSelection",
+          "command": "promptlint.showDiff",
+          "group": "promptlint@3"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "PromptLint",
+      "properties": {
+        "promptlint.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable PromptLint analysis"
+        },
+        "promptlint.autoAnalyze": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically analyze text when typing (experimental)"
+        },
+        "promptlint.showTokenCount": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show token count in status bar"
+        },
+        "promptlint.pythonPath": {
+          "type": "string",
+          "default": "python3",
+          "description": "Path to Python executable"
+        },
+        "promptlint.promptlintPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to PromptLint installation (leave empty for auto-detect)"
+        },
+        "promptlint.showInfoLevel": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show INFO level findings"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "pretest": "npm run lint",
+    "test": "node ./test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "@types/node": "16.x",
+    "eslint": "^8.41.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/promptlint"
+  },
+  "license": "MIT"
+}
