@@ -45,7 +45,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -e ./cli
       
       - name: Run PromptLint
         run: |
@@ -427,15 +427,11 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-# Copy requirements and install
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy promptlint source
-COPY promptlint/ ./promptlint/
-COPY .promptlintrc .
-
-# Set entrypoint
+# Copy CLI package and install
+COPY cli/ /app/cli/
+WORKDIR /app/cli
+RUN pip install --no-cache-dir -r requirements.txt && pip install -e .
+WORKDIR /app
 ENTRYPOINT ["python", "-m", "promptlint.cli"]
 CMD ["--help"]
 ```
@@ -453,7 +449,7 @@ docker run --rm -v $(pwd)/prompts:/prompts promptlint:latest \
 # Run with custom config
 docker run --rm \
   -v $(pwd)/prompts:/prompts \
-  -v $(pwd)/.promptlintrc:/app/.promptlintrc \
+  -v $(pwd)/cli/.promptlintrc:/app/.promptlintrc \
   promptlint:latest \
   --file /prompts/system_prompt.txt \
   --show-dashboard
@@ -471,7 +467,7 @@ services:
     build: .
     volumes:
       - ./prompts:/prompts:ro
-      - ./.promptlintrc:/app/.promptlintrc:ro
+      - ./cli/.promptlintrc:/app/.promptlintrc:ro
     command: --file /prompts/system_prompt.txt --format json
 ```
 

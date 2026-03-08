@@ -70,8 +70,8 @@ With **15+ intelligent checks** and **5 auto-fix capabilities**, PromptLint ensu
 ## Quick Start
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# Install the CLI from the cli/ package (run from repo root)
+pip install -e ./cli
 
 # Lint a prompt
 python -m promptlint.cli --file prompt.txt

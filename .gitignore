@@ -39,3 +39,13 @@ Desktop.ini
 *.db
 .cache/
 featurex.md
+
+# VS Code extension (when added)
+vscode/node_modules/
+vscode/out/
+
+# Landing (when added)
+landing/node_modules/
+landing/dist/
+landing/.next/
+landing/.astro/

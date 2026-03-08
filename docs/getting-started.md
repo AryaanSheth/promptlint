@@ -20,15 +20,16 @@ PromptLint is a comprehensive prompt quality analyzer that helps teams shipping 
 git clone https://github.com/your-org/promptlint.git
 cd promptlint
 
-# Install dependencies
-pip install -r requirements.txt
+# Install the CLI (from repo root)
+pip install -e ./cli
+# Or from inside cli/: pip install -r requirements.txt  or  pip install -e .
 ```
 
 ### 2. Run Your First Lint
 
 ```bash
-# Analyze a prompt file
-python -m promptlint.cli --file demo/example_bad_prompt.txt
+# Analyze a prompt file (paths relative to current directory)
+python -m promptlint.cli --file cli/demo/example_bad_prompt.txt
 
 # Analyze inline text
 python -m promptlint.cli --text "Please write me a function"

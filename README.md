@@ -5,6 +5,15 @@ cost waste, quality issues, structural problems, and security risks before promp
 With **15+ intelligent checks** and **auto-fix capabilities**, PromptLint ensures your prompts are 
 clear, efficient, and production-ready.
 
+## Repository structure
+
+| Directory | Purpose |
+|-----------|---------|
+| **[cli/](cli/)** | Command-line tool (Python). Lint prompts from the terminal or CI. |
+| **[vscode/](vscode/)** | *(Planned)* VS Code extension for editor integration. |
+| **[landing/](landing/)** | *(Planned)* Landing / marketing site. |
+| **docs/** | Project documentation (configuration, rules, integrations). |
+
 ## One‑line value prop
 **Comprehensive prompt analysis with 15+ quality checks, auto-fix, and measurable cost savings.**
 
@@ -62,10 +71,13 @@ clear, efficient, and production-ready.
 
 ## Live demo script
 
+Install the CLI first: `pip install -e ./cli` (from repo root) or `pip install -e .` from `cli/`. Then:
+
 ### Basic analysis
 ```bash
 python -m promptlint.cli --file my_prompt.txt
 ```
+*(Run from repo root or `cli/`; or use `promptlint` if installed as a console script.)*
 
 ### With cost dashboard
 ```bash
@@ -235,9 +247,15 @@ fix:
 - **Zero dependencies** on external services
 
 ## Installation
+
+Install the CLI from the [cli/](cli/) package:
+
 ```bash
-python -m pip install -r requirements.txt
+pip install -e ./cli
 ```
+*(From repo root.)* Or from inside `cli/`: `pip install -r requirements.txt` or `pip install -e .`
+
+See [cli/README.md](cli/README.md) for run and config details.
 
 ## CLI Options
 
