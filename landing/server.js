@@ -26,20 +26,9 @@ if (!supabaseUrl || !supabaseKey) {
 const sb = createClient(supabaseUrl, supabaseKey);
 const resend = resendKey ? new Resend(resendKey) : null;
 
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      imgSrc: ["'self'", "data:"],
-      connectSrc: ["'self'"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      objectSrc: ["'none'"],
-      frameAncestors: ["'none'"],
-    }
-  }
-}));
+// CSP disabled because index.html uses inline <script> and <style>.
+// Re-enable once those are extracted to separate files.
+app.use(helmet({ contentSecurityPolicy: false }));
 
 app.use(express.json({ limit: '2kb' }));
 
@@ -66,7 +55,7 @@ const readLimiter = rateLimit({
 });
 app.use('/api/signup-count', readLimiter);
 
-app.use(express.static(path.join(__dirname, 'public'), { dotfiles: 'deny' }));
+app.use(express.static(path.join(__dirname), { dotfiles: 'deny' }));
 
 app.get('/api/signup-count', async (req, res) => {
   try {
@@ -125,7 +114,7 @@ app.post('/api/signup', async (req, res) => {
 });
 
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 app.listen(PORT, () => {
