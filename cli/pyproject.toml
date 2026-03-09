@@ -31,9 +31,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/aryaag/promptlint"
-Repository = "https://github.com/aryaag/promptlint"
-Changelog = "https://github.com/aryaag/promptlint/blob/main/cli/CHANGELOG.md"
+Homepage = "https://github.com/AryaanSheth/promptlint"
+Repository = "https://github.com/AryaanSheth/promptlint"
+Changelog = "https://github.com/AryaanSheth/promptlint/blob/main/cli/CHANGELOG.md"
 
 [project.scripts]
 promptlint = "promptlint.cli:main"
