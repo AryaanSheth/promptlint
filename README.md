@@ -69,24 +69,28 @@ clear, efficient, and production‑ready.
 - **Edge case reminders**: prompt for error handling specifications
 - **Requirement coverage**: ensure all aspects of the task are addressed
 
-### Live demo script
+### Quick start
 
 Install the CLI first: `pip install -e ./cli` (from repo root) or `pip install -e .` from `cli/`. Then:
 
 #### Basic analysis
 ```bash
-python -m promptlint.cli --file my_prompt.txt
+promptlint --file my_prompt.txt
 ```
-*(Run from repo root or `cli/`; or use `promptlint` if installed as a console script.)*
 
 #### With cost dashboard
 ```bash
-python -m promptlint.cli --file my_prompt.txt --show-dashboard
+promptlint --file my_prompt.txt --show-dashboard
 ```
 
 #### With auto-fix
 ```bash
-python -m promptlint.cli --file my_prompt.txt --fix
+promptlint --file my_prompt.txt --fix
+```
+
+#### Multi-file with globs
+```bash
+promptlint prompts/**/*.txt --exclude prompts/drafts/*
 ```
 
 ### Example output
@@ -101,28 +105,29 @@ In order to accomplish this task, it might be better if the error handling is do
 Output (abbreviated):
 ```
 PromptLint Findings
-[ INFO ] cost (line -) Prompt is 85 tokens for model gpt-4o. Using $0.005/1k and 1,000,000/day.
-[ WARN ] structure-tags (line -) Missing XML tags: <task>, <context>, <output_format>
-[ WARN ] clarity-vague-terms (line 1) Vague term 'some' detected. Be more specific.
-[ WARN ] clarity-vague-terms (line 1) Vague term 'various' detected. Be more specific.
-[ WARN ] clarity-vague-terms (line 1) Vague term 'maybe' detected (uncertain language).
-[ INFO ] verbosity-redundancy (line 1) Redundant phrase 'In order to' detected. Use simpler alternative.
-[ WARN ] politeness-bloat (line 1) Politeness filler detected: 'Please'. AI doesn't need manners.
-[ INFO ] specificity-examples (line -) Consider adding examples to clarify expected output format.
+[ INFO     ] cost (line -) Prompt is ~38 tokens (~$0.0002 input per call on gpt-4o).
+[ WARN     ] structure-sections (line -) No explicit sections detected (Task/Context/Output).
+[ WARN     ] clarity-vague-terms (line 1) Vague term 'some' detected (vague quantifier). Be more specific.
+[ WARN     ] clarity-vague-terms (line 1) Vague term 'various' detected (vague quantifier). Be more specific.
+[ WARN     ] clarity-vague-terms (line 2) Vague term 'maybe' detected (uncertain language). Be more specific.
+[ INFO     ] verbosity-redundancy (line 3) Redundant phrase 'In order to' detected. Use simpler alternative.
+[ WARN     ] politeness-bloat (line 1) Consider removing 'Please' (adds 1.5 tokens without semantic value).
+[ INFO     ] specificity-examples (line -) Consider adding examples to clarify expected output format.
 
+1 file(s) scanned, 12 finding(s) in 0.42s
+```
+
+With `--fix --show-dashboard`:
+```
 Savings Dashboard
-Current Tokens: 85
-Optimized Tokens: 44
-Monthly Waste: $12,927
-Billion Dollar Status: 0.0155% of $1B saved
-```
+Current Tokens: 38
+Optimized Tokens: 22 (42.1% reduction)
+Savings per Call: ~$0.0001
 
-With `--fix` flag:
-```
 Optimized Prompt
-<task>write code that does various things with maybe several functions.
+<task>Write code that does various things with maybe several functions.
 The user should be provided with appropriate output that is nice and good.
-to accomplish this task, it might be better if the error handling is done properly.</task>
+To accomplish this task, it might be better if the error handling is done properly.</task>
 ```
 
 ### Output modes
@@ -132,7 +137,7 @@ to accomplish this task, it might be better if the error handling is done proper
 
 ### CI / pre‑commit ready
 ```bash
-python -m promptlint.cli --file prompts/system.txt --fail-level warn
+promptlint prompts/system.txt --fail-level warn --quiet
 ```
 
 Exit codes:
@@ -170,17 +175,8 @@ rules:
       - you are now a [a-zA-Z ]+
 
   # Structure & Organization
-  structure_tags:
+  structure_sections:
     enabled: true
-    required_tags:
-      - task
-      - context
-      - output_format
-  structure_delimiters:
-    enabled: true
-    delimiters:
-      - "```"
-      - "---"
 
   # Quality: Clarity
   clarity_vague_terms:
@@ -259,17 +255,25 @@ See `cli/README.md` for run and config details.
 ### CLI options
 
 ```bash
-python -m promptlint.cli [OPTIONS]
+promptlint [FILES...] [OPTIONS]
 
 Options:
-  --file, -f PATH          Path to prompt file
-  --text, -t TEXT          Prompt text (inline)
-  --config, -c PATH        Path to config file (default: .promptlintrc)
-  --format FORMAT          Output format: text or json (default: text)
+  -V, --version            Show version and exit
+  --file, -f PATH          Single prompt file path
+  --text, -t TEXT          Inline prompt text
+  --config, -c PATH        Config file path (default: .promptlintrc)
+  --format {text,json}     Output format (default: text)
   --fix                    Apply auto-fixes and print optimized prompt
   --fail-level LEVEL       Exit on level: none, warn, critical (default: critical)
   --show-dashboard         Include savings dashboard in output
+  --quiet, -q              Suppress findings; print summary line only (CI mode)
+  --exclude PATTERN        Glob pattern(s) to exclude (repeatable)
+  --list-rules             List all available rules and exit
+  --explain RULE_ID        Show detailed explanation of a rule and exit
+  --init                   Generate a starter .promptlintrc
 ```
+
+You can also pipe input: `echo "my prompt" | promptlint --format json`
 
 ## Features at a glance
 
@@ -307,3 +311,7 @@ Options:
 - **No API keys in the repo:** all provider keys (for example, Supabase or Resend) are supplied via environment variables or local config files that are gitignored.
 - **Local‑only analysis:** prompt text is analyzed locally by the CLI; you control when and where prompts are stored.
 - **Landing app safety:** the `landing/` backend reads Supabase and email credentials from `.env`/`.config` files only and never exposes them to the browser.
+
+## License
+
+Licensed under the [Apache License, Version 2.0](LICENSE).

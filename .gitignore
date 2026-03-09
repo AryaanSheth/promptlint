@@ -38,7 +38,6 @@ Desktop.ini
 *.sqlite3
 *.db
 .cache/
-featurex.md
 
 # Cryptographic material (defense-in-depth; should never be committed)
 *.pem
