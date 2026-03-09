@@ -8,6 +8,7 @@ const express = require('express');
 const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const { Resend } = require('resend');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
@@ -15,6 +16,8 @@ const PORT = process.env.PORT || 3000;
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_ANON_KEY;
+const resendKey = process.env.RESEND_API_KEY;
+const fromEmail = process.env.FROM_EMAIL || 'no-reply@promptlint.dev';
 
 if (!supabaseUrl || !supabaseKey) {
   console.error('Missing SUPABASE_URL or SUPABASE_ANON_KEY. Add them to landing/.env or landing/.config (see .env.example).');
@@ -22,6 +25,7 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 const sb = createClient(supabaseUrl, supabaseKey);
+const resend = resendKey ? new Resend(resendKey) : null;
 
 // Security: strict transport, XSS, etc. (no CSP so inline scripts in index.html keep working)
 app.use(helmet({ contentSecurityPolicy: false }));
@@ -66,6 +70,29 @@ app.post('/api/signup', async (req, res) => {
       if (error.code === '23505') return res.status(409).json({ error: 'already_signed_up' });
       return res.status(400).json({ error: error.message });
     }
+
+    // Fire-and-forget welcome email (only if Resend is configured)
+    if (resend) {
+      resend.emails
+        .send({
+          from: fromEmail,
+          to: email,
+          subject: 'You’re on the PromptLint waitlist',
+          text: [
+            'Thanks for joining the PromptLint waitlist!',
+            '',
+            'We’ll email you when:',
+            '- the VS Code extension is live, and',
+            '- the CLI hits v1.',
+            '',
+            '— The PromptLint team',
+          ].join('\n'),
+        })
+        .catch((err) => {
+          console.error('Resend email error:', err.message);
+        });
+    }
+
     const { data: count } = await sb.rpc('get_signup_count');
     res.json({ ok: true, count: count ?? 0 });
   } catch (err) {

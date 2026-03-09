@@ -8,13 +8,13 @@ import sys
 import subprocess
 from pathlib import Path
 
-def run_command(cmd, description):
-    """Run a command and display the results."""
+def run_command(args, description):
+    """Run a command (list of args, no shell) and display the results."""
     print("\n" + "=" * 80)
     print(f"  {description}")
     print("=" * 80)
-    print(f"$ {cmd}\n")
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    print(f"$ {' '.join(args)}\n")
+    result = subprocess.run(args, capture_output=True, text=True)
     print(result.stdout)
     if result.returncode != 0 and result.returncode != 2:
         print(f"Error: {result.stderr}")
@@ -30,31 +30,31 @@ def main():
 
     # Test 1: Bad prompt analysis
     run_command(
-        "python -m promptlint.cli --file demo/example_bad_prompt.txt",
+        [sys.executable, "-m", "promptlint.cli", "--file", "demo/example_bad_prompt.txt"],
         "TEST 1: Analyzing a poorly-written prompt (20+ issues expected)"
     )
 
     # Test 2: Bad prompt with dashboard
     run_command(
-        "python -m promptlint.cli --file demo/example_bad_prompt.txt --show-dashboard",
+        [sys.executable, "-m", "promptlint.cli", "--file", "demo/example_bad_prompt.txt", "--show-dashboard"],
         "TEST 2: Same prompt with savings dashboard"
     )
 
     # Test 3: Auto-fix demonstration
     run_command(
-        "python -m promptlint.cli --file demo/example_bad_prompt.txt --fix",
+        [sys.executable, "-m", "promptlint.cli", "--file", "demo/example_bad_prompt.txt", "--fix"],
         "TEST 3: Auto-fix optimization (removes bloat, fixes redundancy, adds structure)"
     )
 
     # Test 4: Good prompt analysis
     run_command(
-        "python -m promptlint.cli --file demo/example_good_prompt.txt",
+        [sys.executable, "-m", "promptlint.cli", "--file", "demo/example_good_prompt.txt"],
         "TEST 4: Analyzing a well-written prompt (minimal issues expected)"
     )
 
     # Test 5: JSON output
     run_command(
-        "python -m promptlint.cli --file demo/example_good_prompt.txt --format json",
+        [sys.executable, "-m", "promptlint.cli", "--file", "demo/example_good_prompt.txt", "--format", "json"],
         "TEST 5: JSON output for CI/CD integration"
     )
 

@@ -40,6 +40,13 @@ Desktop.ini
 .cache/
 featurex.md
 
+# Cryptographic material (defense-in-depth; should never be committed)
+*.pem
+*.key
+*.pfx
+*.crt
+*.cert
+
 # VS Code extension (when added)
 vscode/node_modules/
 vscode/out/
@@ -49,3 +56,5 @@ landing/node_modules/
 landing/dist/
 landing/.next/
 landing/.astro/
+landing/.env
+landing/.config
