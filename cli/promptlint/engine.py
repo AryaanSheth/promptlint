@@ -39,6 +39,9 @@ class LintEngine:
         if not self.config.enabled_rules.get("politeness-bloat", True):
             return results
 
+        if not self.config.politeness_words:
+            return results
+
         escaped_words = [re.escape(word) for word in self.config.politeness_words]
         bloat_regex = r"(?<!\w)(?:" + "|".join(escaped_words) + r")(?!\w)"
         bloat_matches = list(re.finditer(bloat_regex, text, re.IGNORECASE))

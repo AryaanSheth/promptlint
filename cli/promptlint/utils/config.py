@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List
@@ -43,7 +45,7 @@ class PromptlintConfig:
         ]
     )
     politeness_savings_per_hit: float = 1.5
-    allow_politeness: bool = False  # If True, politeness detection is INFO-level only
+    allow_politeness: bool = False
     injection_patterns: List[str] = field(
         default_factory=lambda: [
             "ignore previous instructions",
@@ -51,7 +53,7 @@ class PromptlintConfig:
             "you are now a [a-zA-Z ]+",
         ]
     )
-    structure_style: str = "auto"  # "auto", "xml", "headings", "markdown", "none"
+    structure_style: str = "auto"
     required_tags: List[str] = field(
         default_factory=lambda: ["task", "context", "output_format"]
     )
@@ -76,7 +78,6 @@ class PromptlintConfig:
         enabled_rules = cls().enabled_rules.copy()
         for key, value in rules_cfg.items():
             normalized = _normalize_rule_key(key)
-            # Backward compatibility: map old structure rules to new one
             if normalized in ("structure-tags", "structure-delimiters"):
                 normalized = "structure-sections"
             if isinstance(value, dict):
@@ -105,22 +106,25 @@ class PromptlintConfig:
             if isinstance(value, bool):
                 fix_rules[normalized] = value
 
-        preview_length = _coerce_int(
+        preview_length = _clamp_int(
             display_cfg.get("preview_length", data.get("preview_length", cls.preview_length)),
-            cls.preview_length,
+            1, 500, cls.preview_length,
         )
-        context_width = _coerce_int(
+        context_width = _clamp_int(
             display_cfg.get("context_width", data.get("context_width", cls.context_width)),
-            cls.context_width,
+            1, 500, cls.context_width,
         )
+
+        raw_patterns = _coerce_list(
+            injection_cfg.get("patterns"), cls().injection_patterns
+        )
+        validated_patterns = _validate_regex_patterns(raw_patterns)
 
         return cls(
             model=str(data.get("model", cls.model)),
-            token_limit=int(data.get("token_limit", cls.token_limit)),
-            cost_per_1k_tokens=float(
-                data.get("cost_per_1k_tokens", cls.cost_per_1k_tokens)
-            ),
-            calls_per_day=int(data.get("calls_per_day", cls.calls_per_day)),
+            token_limit=_clamp_int(data.get("token_limit", cls.token_limit), 1, 1_000_000, cls.token_limit),
+            cost_per_1k_tokens=_clamp_float(data.get("cost_per_1k_tokens", cls.cost_per_1k_tokens), 0.0, 1000.0, cls.cost_per_1k_tokens),
+            calls_per_day=_clamp_int(data.get("calls_per_day", cls.calls_per_day), 1, 1_000_000_000, cls.calls_per_day),
             preview_length=preview_length,
             context_width=context_width,
             enabled_rules=enabled_rules,
@@ -135,12 +139,10 @@ class PromptlintConfig:
                 cls.politeness_savings_per_hit,
             ),
             allow_politeness=bool(
-                politeness_cfg.get("allow_politeness", 
+                politeness_cfg.get("allow_politeness",
                 data.get("allow_politeness", cls.allow_politeness))
             ),
-            injection_patterns=_coerce_list(
-                injection_cfg.get("patterns"), cls().injection_patterns
-            ),
+            injection_patterns=validated_patterns,
             required_tags=_coerce_list(
                 structure_tags_cfg.get("required_tags"), cls().required_tags
             ),
@@ -161,6 +163,9 @@ def load_config(path: str | Path | None = None) -> PromptlintConfig:
     if not isinstance(data, dict):
         return PromptlintConfig()
     return PromptlintConfig.from_mapping(data)
+
+
+# ── Helpers ─────────────────────────────────────────────────────────────
 
 
 def _normalize_rule_key(key: str) -> str:
@@ -198,3 +203,34 @@ def _coerce_int(value: Any, default: int) -> int:
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def _clamp_int(value: Any, lo: int, hi: int, default: int) -> int:
+    try:
+        v = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(lo, min(v, hi))
+
+
+def _clamp_float(value: Any, lo: float, hi: float, default: float) -> float:
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return default
+    return max(lo, min(v, hi))
+
+
+def _validate_regex_patterns(patterns: List[str]) -> List[str]:
+    """Compile each pattern to verify it is valid regex. Warn and skip bad ones."""
+    valid: List[str] = []
+    for p in patterns:
+        try:
+            re.compile(p)
+            valid.append(p)
+        except re.error as exc:
+            print(
+                f"[promptlint] WARNING: Skipping invalid injection pattern '{p}': {exc}",
+                file=sys.stderr,
+            )
+    return valid

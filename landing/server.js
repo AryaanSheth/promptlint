@@ -1,4 +1,3 @@
-// Load .env or .config (both gitignored) so URL and key never touch the frontend
 require('dotenv').config();
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
   require('dotenv').config({ path: require('path').join(__dirname, '.config') });
@@ -27,22 +26,47 @@ if (!supabaseUrl || !supabaseKey) {
 const sb = createClient(supabaseUrl, supabaseKey);
 const resend = resendKey ? new Resend(resendKey) : null;
 
-// Security: strict transport, XSS, etc. (no CSP so inline scripts in index.html keep working)
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      imgSrc: ["'self'", "data:"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+    }
+  }
+}));
 
 app.use(express.json({ limit: '2kb' }));
 
-// Rate limit signup to reduce abuse (5 per IP per 15 min)
+const globalLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+});
+app.use(globalLimiter);
+
 const signupLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
   message: { error: 'Too many signups; try again later.' },
-  standardHeaders: true
+  standardHeaders: true,
 });
 app.use('/api/signup', signupLimiter);
 
-// Static files (Express does not serve dotfiles by default, so .env/.config are safe)
-app.use(express.static(path.join(__dirname), { dotfiles: 'deny' }));
+const readLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 60,
+  message: { error: 'Too many requests; try again later.' },
+  standardHeaders: true,
+});
+app.use('/api/signup-count', readLimiter);
+
+app.use(express.static(path.join(__dirname, 'public'), { dotfiles: 'deny' }));
 
 app.get('/api/signup-count', async (req, res) => {
   try {
@@ -54,7 +78,6 @@ app.get('/api/signup-count', async (req, res) => {
   }
 });
 
-// Basic email validation: length and format (no exotic chars that could break DB)
 const EMAIL_MAX_LEN = 254;
 const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
 
@@ -68,24 +91,24 @@ app.post('/api/signup', async (req, res) => {
     const { error } = await sb.from('signups').insert([{ email }]);
     if (error) {
       if (error.code === '23505') return res.status(409).json({ error: 'already_signed_up' });
-      return res.status(400).json({ error: error.message });
+      console.error('signup insert error:', error.message);
+      return res.status(400).json({ error: 'Signup failed' });
     }
 
-    // Fire-and-forget welcome email (only if Resend is configured)
     if (resend) {
       resend.emails
         .send({
           from: fromEmail,
           to: email,
-          subject: 'You’re on the PromptLint waitlist',
+          subject: 'You\u2019re on the PromptLint waitlist',
           text: [
             'Thanks for joining the PromptLint waitlist!',
             '',
-            'We’ll email you when:',
+            'We\u2019ll email you when:',
             '- the VS Code extension is live, and',
             '- the CLI hits v1.',
             '',
-            '— The PromptLint team',
+            '\u2014 The PromptLint team',
           ].join('\n'),
         })
         .catch((err) => {
@@ -102,7 +125,7 @@ app.post('/api/signup', async (req, res) => {
 });
 
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.listen(PORT, () => {

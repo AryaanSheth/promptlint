@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "promptlint"
+version = "1.0.0"
+description = "A static analyzer for LLM prompts — catches cost waste, quality issues, and security risks."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+dependencies = [
+    "pyyaml~=6.0",
+    "tiktoken~=0.5",
+    "rich~=13.0",
+]
+
+[project.scripts]
+promptlint = "promptlint.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["promptlint*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

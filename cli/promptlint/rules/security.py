@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import sys
 from typing import Dict, List
 
 from ..utils.config import PromptlintConfig
@@ -43,7 +44,14 @@ def check_injection(text: str, config: PromptlintConfig) -> List[Dict[str, objec
         return results
 
     for pattern in config.injection_patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
+        try:
+            match = re.search(pattern, text, re.IGNORECASE)
+        except re.error as exc:
+            print(
+                f"[promptlint] WARNING: Skipping bad injection pattern '{pattern}': {exc}",
+                file=sys.stderr,
+            )
+            continue
         if match:
             results.append(
                 {
