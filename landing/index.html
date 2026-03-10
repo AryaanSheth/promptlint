@@ -100,7 +100,10 @@ nav .wrap {
   color: var(--text-dim);
   border-radius: 2px;
   letter-spacing: 0.12em;
+  text-decoration: none;
+  transition: border-color 0.15s, color 0.15s;
 }
+.nav-pill:hover { border-color: var(--accent); color: var(--accent); }
 
 /* HERO */
 .hero { padding: 92px 0 80px; }
@@ -140,52 +143,77 @@ nav .wrap {
   margin-bottom: 40px;
 }
 
-/* FORM */
-.form-row {
+/* INSTALL BLOCK */
+.install-block {
   display: flex;
-  max-width: 400px;
+  align-items: center;
+  max-width: 420px;
   border: 1px solid var(--border);
   border-radius: 3px;
   overflow: hidden;
-  transition: border-color 0.15s;
+  background: var(--card-bg);
 }
-.form-row:focus-within { border-color: rgba(255,255,255,0.22); }
 
-.form-row input {
+.install-prompt {
+  padding: 11px 0 11px 16px;
+  color: var(--text-dim);
+  font-size: 12px;
+  user-select: none;
+}
+
+.install-cmd {
   flex: 1;
-  background: transparent;
-  border: none;
-  color: var(--text-bright);
+  padding: 11px 12px;
+  color: var(--accent);
   font-family: var(--mono);
   font-size: 12px;
-  padding: 11px 16px;
-  outline: none;
-  min-width: 0;
+  font-weight: 500;
+  letter-spacing: 0.02em;
 }
-.form-row input::placeholder { color: var(--text-dim); }
 
-.form-row button {
-  background: var(--accent);
-  color: #000;
+.install-copy {
+  background: transparent;
+  color: var(--text-dim);
   font-family: var(--mono);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.12em;
   padding: 11px 18px;
   border: none;
+  border-left: 1px solid var(--border);
   cursor: pointer;
   white-space: nowrap;
-  transition: opacity 0.15s;
+  transition: color 0.15s, background 0.15s;
   flex-shrink: 0;
 }
-.form-row button:hover { opacity: 0.82; }
+.install-copy:hover { color: var(--text-bright); background: rgba(255,255,255,0.04); }
 
 .form-hint {
   margin-top: 11px;
   font-size: 10px;
-  color: var(--text-mid);
+  color: var(--text-dim);
   letter-spacing: 0.05em;
 }
+.form-hint a {
+  color: var(--accent);
+  text-decoration: none;
+  transition: opacity 0.15s;
+}
+.form-hint a:hover { opacity: 0.75; }
+
+/* CTA LINKS */
+.cta-links {
+  margin-top: 18px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+.cta-links a {
+  color: var(--text-mid);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.cta-links a:hover { color: var(--accent); }
+.cta-sep { color: var(--text-dim); margin: 0 10px; }
 
 /* CARD */
 .card {
@@ -315,23 +343,6 @@ nav .wrap {
 .cta-section p  { color: var(--text-dim); font-size: 12px; margin-bottom: 28px; }
 
 
-/* COUNT BADGE */
-.count-badge {
-  font-size: 11px;
-  color: var(--text-dim);
-  letter-spacing: 0.08em;
-  margin-bottom: 20px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.count-badge .signup-count {
-  color: var(--accent);
-  font-weight: 500;
-  font-size: 13px;
-}
-
 /* CURSOR */
 .cursor {
   display: inline-block; width: 2px; height: 0.9em;
@@ -355,82 +366,24 @@ footer p { font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em; }
   .feat:nth-child(3) { border-bottom: 1px solid var(--border-dim); }
   .stat { border-right: none; border-bottom: 1px solid var(--border-dim); }
   .stat:last-child { border-bottom: none; }
-  .form-row { flex-direction: column; }
-  .form-row button { padding: 12px; }
+  .install-block { max-width: 100%; }
   .nav-right a { display: none; }
 }
 </style>
 
 <script>
-  // No Supabase keys in the frontend — server reads from .env (see server.js)
-
-  async function getSignupCount() {
-    try {
-      const res = await fetch('/api/signup-count')
-      const data = await res.json()
-      return data.count ?? 0
-    } catch (_) {
-      return 0
-    }
-  }
-
-  async function submitEmail(email) {
-    const res = await fetch('/api/signup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email })
-    })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) return { status: res.status, code: data.error === 'already_signed_up' ? '23505' : null }
-    return { count: data.count }
-  }
-
-  async function handleSignup(btn) {
-    const row = btn.closest('.form-row')
-    const input = row.querySelector('input[type="email"]')
-    const email = input.value.trim()
-
-    if (!email || !email.includes('@')) {
-      input.style.borderColor = 'rgba(255,68,68,0.6)'
-      setTimeout(() => input.style.borderColor = '', 1200)
-      return
-    }
-
-    btn.textContent = '...'
-    btn.disabled = true
-
-    const result = await submitEmail(email)
-
-    if (result && result.code === '23505') {
-      btn.textContent = 'ALREADY IN'
-      btn.style.background = '#333'
-      btn.style.color = '#888'
-    } else if (result && result.status) {
-      btn.textContent = 'ERROR'
-      btn.style.background = '#ff4444'
+  function copyInstall(btn) {
+    navigator.clipboard.writeText('pip install promptlint-cli').then(() => {
+      btn.textContent = 'COPIED ✓'
+      btn.style.background = '#00ff88'
       btn.style.color = '#000'
-    } else {
-      btn.textContent = 'DONE ✓'
-      input.value = ''
-      input.placeholder = 'you\'re on the list'
-      const count = result && typeof result.count === 'number' ? result.count : await getSignupCount()
-      document.querySelectorAll('.signup-count').forEach(el => { el.textContent = count })
-    }
-
-    setTimeout(() => {
-      btn.disabled = false
-      btn.textContent = btn.dataset.label
-      btn.style.background = ''
-      btn.style.color = ''
-    }, 3000)
-  }
-
-  document.addEventListener('DOMContentLoaded', async () => {
-    const count = await getSignupCount()
-    document.querySelectorAll('.signup-count').forEach(el => {
-      el.textContent = count
+      setTimeout(() => {
+        btn.textContent = 'COPY'
+        btn.style.background = ''
+        btn.style.color = ''
+      }, 2000)
     })
-  })
+  }
 </script>
 </head>
 <body>
@@ -441,7 +394,7 @@ footer p { font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em; }
     <div class="nav-right">
       <a href="#features">features</a>
       <a href="https://github.com/AryaanSheth/promptlint" target="_blank" rel="noopener">github</a>
-      <span class="nav-pill">EARLY ACCESS</span>
+      <a href="https://pypi.org/project/promptlint-cli/" target="_blank" rel="noopener" class="nav-pill">PYPI</a>
     </div>
   </div>
 </nav>
@@ -449,17 +402,17 @@ footer p { font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em; }
 <section class="hero">
   <div class="wrap">
     <div class="eyebrow">dev tooling for the llm era</div>
-    <div class="count-badge"><span class="signup-count">—</span> devs on the waitlist</div>
     <h1>Your prompts have bugs.<br><em>PromptLint finds them.</em><span class="cursor"></span></h1>
     <p class="hero-desc">
       A static analyzer for LLM prompts. Catches injection attacks, token waste,
       and structural issues before they hit production — zero API calls, zero latency.
     </p>
-    <div class="form-row">
-      <input type="email" placeholder="you@company.com" />
-      <button data-label="GET EARLY ACCESS" onclick="handleSignup(this)">GET EARLY ACCESS</button>
+    <div class="install-block">
+      <span class="install-prompt">$</span>
+      <code class="install-cmd">pip install promptlint-cli</code>
+      <button class="install-copy" onclick="copyInstall(this)">COPY</button>
     </div>
-    <p class="form-hint">[*] free on VS Code marketplace &nbsp;·&nbsp; launching soon</p>
+    <p class="form-hint">[*] Python 3.9+ &nbsp;·&nbsp; Apache 2.0 &nbsp;·&nbsp; <a href="https://pypi.org/project/promptlint-cli/" target="_blank" rel="noopener">view on PyPI</a></p>
   </div>
 </section>
 
@@ -566,11 +519,19 @@ footer p { font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em; }
 
 <section class="cta-section">
   <div class="wrap">
-    <h2>Be the first to know.</h2>
-    <p>Get notified when PromptLint hits the VS Code Marketplace.</p>
-    <div class="form-row">
-      <input type="email" placeholder="you@company.com" />
-      <button data-label="NOTIFY ME" onclick="handleSignup(this)">NOTIFY ME</button>
+    <h2>Get started in seconds.</h2>
+    <p>Install the CLI and start linting your prompts.</p>
+    <div class="install-block">
+      <span class="install-prompt">$</span>
+      <code class="install-cmd">pip install promptlint-cli</code>
+      <button class="install-copy" onclick="copyInstall(this)">COPY</button>
+    </div>
+    <div class="cta-links">
+      <a href="https://pypi.org/project/promptlint-cli/" target="_blank" rel="noopener">PyPI</a>
+      <span class="cta-sep">·</span>
+      <a href="https://github.com/AryaanSheth/promptlint" target="_blank" rel="noopener">GitHub</a>
+      <span class="cta-sep">·</span>
+      <a href="https://github.com/AryaanSheth/promptlint/blob/main/cli/README.md" target="_blank" rel="noopener">Docs</a>
     </div>
   </div>
 </section>
@@ -580,8 +541,7 @@ footer p { font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em; }
     <p>© 2026 PromptLint · built by a dev, for devs</p>
     <ul class="flinks">
       <li><a href="https://github.com/AryaanSheth/promptlint" target="_blank" rel="noopener">github</a></li>
-      <!-- <li><a href="#">marketplace</a></li>
-      <li><a href="#">x.com</a></li> -->
+      <li><a href="https://pypi.org/project/promptlint-cli/" target="_blank" rel="noopener">pypi</a></li>
     </ul>
   </div>
 </footer>
