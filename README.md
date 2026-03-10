@@ -20,6 +20,12 @@ PromptLint Findings
 
 ### Install
 
+#### Install from PYPI
+```
+pip install promptlint-cli
+```
+
+#### Install Local Build
 ```bash
 pip install -e ./cli
 ```
