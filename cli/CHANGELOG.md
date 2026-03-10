@@ -3,6 +3,14 @@
 All notable changes to PromptLint are documented here.  
 This project follows [Semantic Versioning](https://semver.org/).
 
+## 1.0.1 — 2026-03-10
+
+### Changed
+- **`tiktoken` is now an optional dependency.** The base install (`pip install promptlint-cli`) no longer requires a Rust compiler or native extensions. Install with `pip install promptlint-cli[tiktoken]` for exact BPE token counts.
+- When `tiktoken` is not installed, the `cost` and `cost-limit` rules use a fast character-based estimate (~4 chars per token) instead. All other rules are unaffected.
+
+---
+
 ## 1.0.0 — 2026-03-09
 
 First public release.

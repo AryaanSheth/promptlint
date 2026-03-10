@@ -10,6 +10,12 @@ Catches token waste, vague language, prompt injection, missing structure, and ot
 pip install promptlint-cli
 ```
 
+For accurate token counting (requires a Rust toolchain on non-CPython):
+
+```bash
+pip install promptlint-cli[tiktoken]
+```
+
 Requires Python 3.9+.
 
 ## Quick start

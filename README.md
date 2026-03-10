@@ -21,13 +21,7 @@ PromptLint Findings
 ### Install
 
 ```bash
-pip install -e ./cli
-```
-
-Or from inside `cli/`:
-
-```bash
-pip install -e .
+pip install promptlint-cli
 ```
 
 Requires Python 3.9+.
@@ -177,7 +171,7 @@ Please write code  # promptlint-disable
 
 - No API keys in the repo. Supabase/Resend credentials are loaded from `.env` files that are gitignored.
 - All analysis is local. Nothing leaves your machine.
-- The landing server only serves static files from `public/` and never exposes secrets to the browser.
+- The landing server never exposes secrets to the browser.
 
 ### License
 

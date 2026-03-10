@@ -39,6 +39,9 @@ Desktop.ini
 *.db
 .cache/
 
+# PyPI credentials
+.pypirc
+
 # Cryptographic material (defense-in-depth; should never be committed)
 *.pem
 *.key
