@@ -3,26 +3,29 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "promptlint"
+name = "promptlint-cli"
 version = "1.0.0"
 description = "A static analyzer for LLM prompts — catches cost waste, quality issues, and security risks."
 readme = "README.md"
-license = {text = "Apache-2.0"}
+license = "Apache-2.0"
 requires-python = ">=3.9"
 authors = [
-    {name = "PromptLint Contributors"},
+    {name = "Aryaan Sheth"},
 ]
+keywords = ["llm", "prompt", "linter", "static-analysis", "prompt-injection", "gpt", "claude", "ai"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Security",
 ]
 dependencies = [
     "pyyaml~=6.0",
