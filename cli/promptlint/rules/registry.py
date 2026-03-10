@@ -56,6 +56,8 @@ _RULES: List[RuleMeta] = [
         long=(
             "Scans for regex patterns commonly used in injection attacks such\n"
             "as 'ignore previous instructions' or 'system prompt extraction'.\n"
+            "Text is normalized before matching to catch leetspeak (1gn0r3),\n"
+            "zero-width unicode characters, and character repetition evasion.\n"
             "Patterns are configurable under rules.prompt_injection.patterns\n"
             "in .promptlintrc.\n\n"
             "With --fix the offending lines are removed entirely.\n\n"

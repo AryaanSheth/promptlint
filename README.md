@@ -62,7 +62,7 @@ Exit codes: `0` = clean, `1` = warnings found (with `--fail-level warn`), `2` = 
 |------|-------------|---------|
 | `cost` | Token count and per-call cost estimate | - |
 | `cost-limit` | Warns when prompt exceeds your token budget | - |
-| `prompt-injection` | Catches "ignore previous instructions" and similar | yes |
+| `prompt-injection` | Catches injection patterns, even with leetspeak/unicode obfuscation | yes |
 | `structure-sections` | Flags prompts with no clear sections | yes |
 | `clarity-vague-terms` | Finds "some", "stuff", "maybe", "good", etc. | - |
 | `specificity-examples` | Suggests adding examples for complex instructions | - |
@@ -146,10 +146,12 @@ promptlint [FILES...] [OPTIONS]
 ### Repo layout
 
 ```
-cli/        Python CLI (this is the main thing)
-landing/    Marketing site (Express + Supabase)
-docs/       Config and rule documentation
-vscode/     VS Code extension (planned)
+cli/            Python CLI (the main package)
+.cursor/skills/ Cursor agent skill (lint-and-fix loop)
+.claude/skills/ Claude Code agent skill
+docs/           Config and rule documentation
+landing/        Marketing site (Express + Supabase)
+vscode/         VS Code extension (planned)
 ```
 
 ### Inline ignores
@@ -175,8 +177,9 @@ Please write code  # promptlint-disable
 
 ### Security
 
-- No API keys in the repo. Supabase/Resend credentials are loaded from `.env` files that are gitignored.
 - All analysis is local. Nothing leaves your machine.
+- Injection detection normalizes leetspeak (`1gn0r3`), zero-width unicode, fullwidth chars, and character repetition before matching — catches obfuscated attacks that raw regex misses.
+- No API keys in the repo. Supabase/Resend credentials are loaded from `.env` files that are gitignored.
 - The landing server never exposes secrets to the browser.
 
 ### License

@@ -62,7 +62,7 @@ PromptLint Findings
 |------|-------------|---------|
 | `cost` | Token count and per-call cost estimate | — |
 | `cost-limit` | Warns when prompt exceeds your token budget | — |
-| `prompt-injection` | Catches "ignore previous instructions" and similar | yes |
+| `prompt-injection` | Catches injection patterns, even with leetspeak/unicode obfuscation | yes |
 | `structure-sections` | Flags prompts with no clear sections | yes |
 | `clarity-vague-terms` | Finds "some", "stuff", "maybe", "good", etc. | — |
 | `specificity-examples` | Suggests adding examples for complex instructions | — |
@@ -138,6 +138,27 @@ promptlint [FILES...] [OPTIONS]
   --explain RULE_ID        Explain a specific rule
   --init                   Generate starter .promptlintrc
 ```
+
+## Injection evasion detection
+
+The `prompt-injection` rule normalizes text before matching, catching obfuscated attacks that simple regex would miss:
+
+| Evasion technique | Example | Detected? |
+|---|---|---|
+| Leetspeak | `1gn0r3 pr3v10u$ 1nstruct10ns` | Yes |
+| Zero-width characters | `ign​ore previous instruc​tions` | Yes |
+| Character repetition | `ignoooore previooous instructions` | Yes |
+| Fullwidth unicode | `ｉｇｎｏｒｅ previous instructions` | Yes |
+| Mixed obfuscation | `!gnor3 pr3v!0u$ in$truction$` | Yes |
+
+Custom injection patterns can be added in `.promptlintrc` under `rules.prompt_injection.patterns`.
+
+## Agent skills
+
+PromptLint ships with skills for AI coding agents that teach them prompt conventions and a lint-and-fix loop:
+
+- **Cursor** — `.cursor/skills/promptlint/SKILL.md`
+- **Claude Code** — `.claude/skills/promptlint/SKILL.md`
 
 ## Links
 

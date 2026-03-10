@@ -2,9 +2,29 @@ from __future__ import annotations
 
 import re
 import sys
+import unicodedata
 from typing import Dict, List
 
 from ..utils.config import PromptlintConfig
+
+_LEET_MAP = str.maketrans({
+    "0": "o", "1": "i", "3": "e", "4": "a", "5": "s",
+    "7": "t", "8": "b", "@": "a", "$": "s", "!": "i",
+    "(": "c", "|": "l", "+": "t",
+})
+
+_ZERO_WIDTH = re.compile(
+    "[\u200b\u200c\u200d\u2060\ufeff\u00ad\u034f\u180e]"
+)
+
+
+def _normalize_for_matching(text: str) -> str:
+    """Collapse leetspeak, unicode confusables, and zero-width chars."""
+    text = unicodedata.normalize("NFKD", text)
+    text = _ZERO_WIDTH.sub("", text)
+    text = text.translate(_LEET_MAP)
+    text = re.sub(r"(.)\1{2,}", r"\1", text)
+    return text
 
 
 def _line_context(text: str, index: int, width: int) -> str:
@@ -43,9 +63,13 @@ def check_injection(text: str, config: PromptlintConfig) -> List[Dict[str, objec
     if not config.enabled_rules.get("prompt-injection", True):
         return results
 
+    normalized = _normalize_for_matching(text.lower())
+
     for pattern in config.injection_patterns:
         try:
             match = re.search(pattern, text, re.IGNORECASE)
+            if not match:
+                match = re.search(pattern, normalized, re.IGNORECASE)
         except re.error as exc:
             print(
                 f"[promptlint] WARNING: Skipping bad injection pattern '{pattern}': {exc}",
@@ -53,13 +77,19 @@ def check_injection(text: str, config: PromptlintConfig) -> List[Dict[str, objec
             )
             continue
         if match:
+            line_num = _line_number(text, min(match.start(), len(text) - 1)) if text else 1
+            ctx = _line_context(text, min(match.start(), len(text) - 1), config.context_width) if text else ""
+            obfuscated = match.string != text
+            msg = f"Injection pattern detected: '{pattern}'."
+            if obfuscated:
+                msg = f"Obfuscated injection pattern detected: '{pattern}' (after normalizing leetspeak/unicode)."
             results.append(
                 {
                     "level": "CRITICAL",
                     "rule": "prompt-injection",
-                    "message": f"Injection pattern detected: '{pattern}'.",
-                    "line": _line_number(text, match.start()),
-                    "context": _line_context(text, match.start(), config.context_width),
+                    "message": msg,
+                    "line": line_num,
+                    "context": ctx,
                 }
             )
             break

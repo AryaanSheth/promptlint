@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "promptlint-cli"
-version = "1.0.1"
+version = "1.0.2"
 description = "A static analyzer for LLM prompts — catches cost waste, quality issues, and security risks."
 readme = "README.md"
 license = "Apache-2.0"

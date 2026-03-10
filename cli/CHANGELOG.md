@@ -3,6 +3,26 @@
 All notable changes to PromptLint are documented here.  
 This project follows [Semantic Versioning](https://semver.org/).
 
+## 1.0.2 — 2026-03-10
+
+### Security
+- **Injection evasion normalization.** The `prompt-injection` rule now normalizes text before matching to catch obfuscated attacks:
+  - **Leetspeak decoding** — `0→o`, `1→i`, `3→e`, `4→a`, `5→s`, `7→t`, `8→b`, `@→a`, `$→s`, `!→i`, `(→c`, `|→l`, `+→t`.
+  - **Zero-width character stripping** — removes `U+200B`, `U+200C`, `U+200D`, `U+2060`, `U+FEFF`, soft hyphens, and other invisible chars.
+  - **Unicode NFKD normalization** — collapses fullwidth and confusable characters to their ASCII equivalents.
+  - **Character repetition collapse** — `ignoooore` → `ignore` (3+ consecutive identical chars reduced to 1).
+- Obfuscated matches display a distinct message: *"Obfuscated injection pattern detected: '...' (after normalizing leetspeak/unicode)."*
+
+### Added
+- **Cursor skill** (`.cursor/skills/promptlint/SKILL.md`) — teaches Cursor agents prompt conventions, the lint-and-fix loop, prompt extraction from code, and the full CLI/rules reference.
+- **Claude Code skill** (`.claude/skills/promptlint/SKILL.md`) — equivalent skill for Claude Code with the same comprehensive coverage.
+- **28 new tests** for injection normalization — unit tests for `_normalize_for_matching` and integration tests for `check_injection` covering leetspeak, zero-width chars, soft hyphens, character repetition, fullwidth unicode, mixed evasion, custom patterns, and false-positive checks. Test suite now at 145 tests.
+
+### Changed
+- Stale planning files (`FEATURES.md`, `featurex.md`, `.github_issue_body.md`) moved to `docs/internal/`.
+
+---
+
 ## 1.0.1 — 2026-03-10
 
 ### Changed
