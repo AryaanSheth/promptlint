@@ -1,0 +1,59 @@
+{
+  "name": "promptlint-vscode",
+  "displayName": "PromptLint",
+  "description": "VS Code extension that runs the promptlint CLI to provide diagnostics and fixes for LLM prompts.",
+  "version": "1.0.0",
+  "publisher": "opencode",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "main": "./dist/extension.js",
+  "categories": ["Linters"],
+  "activationEvents": [
+    "onLanguage:plaintext",
+    "onLanguage:markdown",
+    "onCommand:promptlint.lint",
+    "onCommand:promptlint.fix",
+    "onCommand:promptlint.dashboard",
+    "onCommand:promptlint.explainRule",
+    "onCommand:promptlint.init",
+    "onCommand:promptlint.fixAll"
+  ],
+  "contributes": {
+    "languages": [
+      { "id": "plaintext", "aliases": ["Plain Text"], "extensions": [".txt"] },
+      { "id": "markdown", "aliases": ["Markdown"], "extensions": [".md"] }
+    ],
+    "commands": [
+      { "command": "promptlint.lint", "title": "PromptLint: Lint File" },
+      { "command": "promptlint.fix", "title": "PromptLint: Fix File" },
+      { "command": "promptlint.fixAll", "title": "PromptLint: Fix All File" },
+      { "command": "promptlint.dashboard", "title": "PromptLint: Show Dashboard" },
+      { "command": "promptlint.explainRule", "title": "PromptLint: Explain Rule" },
+      { "command": "promptlint.init", "title": "PromptLint: Initialize Config" }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "PromptLint",
+      "properties": {
+        "promptlint.pythonPath": { "type": "string", "default": "python", "description": "Python interpreter to use" },
+        "promptlint.lintOnSave": { "type": "boolean", "default": true, "description": "Lint on save" },
+        "promptlint.lintOnType": { "type": "boolean", "default": false, "description": "Lint on type (debounced)" },
+        "promptlint.lintOnTypeDelay": { "type": "number", "default": 500, "description": "Debounce delay in ms" },
+        "promptlint.languages": { "type": "array", "items": { "type": "string" }, "default": ["plaintext","markdown","python","javascript","typescript","json","yaml","toml"], "description": "Languages to lint" },
+        "promptlint.configPath": { "type": "string", "default": "", "description": "Path to .promptlintrc" },
+        "promptlint.failLevel": { "type": "string", "enum": ["none","warn","critical"], "default": "critical", "description": "Fail level threshold" },
+        "promptlint.showStatusBar": { "type": "boolean", "default": true, "description": "Show status bar with token/cost" }
+      }
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^18.14.0",
+    "@types/vscode": "^1.80.0",
+    "typescript": "^5.0.4"
+  },
+  "scripts": {
+    "compile": "tsc -p ./tsconfig.json",
+    "watch": "tsc -w -p ./tsconfig.json"
+  }
+}

@@ -3,6 +3,23 @@
 All notable changes to PromptLint are documented here.  
 This project follows [Semantic Versioning](https://semver.org/).
 
+## 1.1.0 — 2026-03-10
+
+### Added
+- **VS Code extension** (`vscode/`) — real-time diagnostics, quick fixes, token/cost status bar, and command palette integration powered by the promptlint CLI.
+  - **Diagnostics on save** — findings appear as squiggly underlines with severity-mapped colors (Error/Warning/Info).
+  - **Lint on type** — optional debounced linting as you type (off by default).
+  - **Quick fixes** — lightbulb menu offers one-click fixes for fixable rules and inline `# promptlint-disable` comments.
+  - **Magic comment markers** — `# promptlint-start` / `# promptlint-end` (or `//`) delimit prompt regions inside `.py`, `.ts`, `.js` files; only those regions are linted.
+  - **Code wrapper stripping** — variable assignments and string delimiters (`"""`, `` ` ``, etc.) inside marker regions are automatically stripped before linting/fixing so the CLI only sees prompt text.
+  - **Indentation-preserving fix** — "Fix File" applies CLI auto-fixes while keeping original indentation and code structure intact.
+  - **Status bar** — live token count and cost-per-call indicator; click to open the dashboard.
+  - **Commands** — Lint File, Fix File, Fix All, Show Dashboard, Explain Rule, Initialize Config.
+  - **Settings** — `promptlint.pythonPath`, `lintOnSave`, `lintOnType`, `lintOnTypeDelay`, `languages`, `configPath`, `failLevel`, `showStatusBar`.
+  - **Auto-detection** — prompts the user to install `promptlint-cli` if the CLI is not found.
+
+---
+
 ## 1.0.2 — 2026-03-10
 
 ### Security

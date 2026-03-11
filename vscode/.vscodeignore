@@ -1,0 +1,12 @@
+npm-debug.log
+node_modules/
+src/
+out/
+.vscode/
+.DS_Store
+*.log
+*.map
+tests/
+coverage/
+tsconfig.json
+.gitignore
