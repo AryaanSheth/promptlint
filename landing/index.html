@@ -382,6 +382,7 @@ footer p { font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em; }
 }
 </style>
 
+<script defer src="/_vercel/insights/script.js"></script>
 <script>
   fetch('/api/downloads').then(r => r.json()).then(d => {
     const el = document.getElementById('download-count');
