@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PromptLint — ESLint for LLM prompts</title>
+<link rel="icon" type="image/svg+xml" href="images/favicon.svg">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -71,11 +72,16 @@ nav .wrap {
 }
 
 .logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 13px;
   font-weight: 500;
   color: var(--text-bright);
   letter-spacing: 0.04em;
+  text-decoration: none;
 }
+.logo img { height: 22px; width: auto; }
 .logo .acc { color: var(--accent); }
 
 .nav-right {
@@ -355,6 +361,8 @@ nav .wrap {
 footer { border-top: 1px solid var(--border-dim); padding: 24px 0; }
 footer .wrap { display: flex; justify-content: space-between; align-items: center; }
 footer p { font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em; }
+.footer-brand { display: flex; align-items: center; gap: 10px; }
+.footer-brand img { height: 16px; width: auto; opacity: 0.5; }
 .flinks { display: flex; gap: 20px; list-style: none; }
 .flinks a { font-size: 10px; color: var(--text-dim); text-decoration: none; letter-spacing: 0.07em; transition: color 0.15s; }
 .flinks a:hover { color: var(--text-mid); }
@@ -390,7 +398,7 @@ footer p { font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em; }
 
 <nav>
   <div class="wrap">
-    <div class="logo"><span class="acc">[</span> promptlint <span class="acc">]</span></div>
+    <a href="/" class="logo"><img src="images/pllogo-green.svg" alt="PromptLint logo">promptlint</a>
     <div class="nav-right">
       <a href="#features">features</a>
       <a href="https://github.com/AryaanSheth/promptlint" target="_blank" rel="noopener">github</a>
@@ -538,7 +546,10 @@ footer p { font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em; }
 
 <footer>
   <div class="wrap">
-    <p>© 2026 PromptLint · built by a dev, for devs</p>
+    <div class="footer-brand">
+      <img src="images/pllogo-green.svg" alt="PromptLint">
+      <p>© 2026 PromptLint · built by a dev, for devs</p>
+    </div>
     <ul class="flinks">
       <li><a href="https://github.com/AryaanSheth/promptlint" target="_blank" rel="noopener">github</a></li>
       <li><a href="https://pypi.org/project/promptlint-cli/" target="_blank" rel="noopener">pypi</a></li>
