@@ -329,7 +329,7 @@ nav .wrap {
 /* STATS */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   margin-top: 20px;
 }
 
@@ -368,6 +368,9 @@ footer p { font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em; }
 .flinks a:hover { color: var(--text-mid); }
 
 /* RESPONSIVE */
+@media (max-width: 700px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
 @media (max-width: 560px) {
   .feat-grid, .stats-grid { grid-template-columns: 1fr; }
   .feat { border-right: none; }
@@ -380,6 +383,11 @@ footer p { font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em; }
 </style>
 
 <script>
+  fetch('/api/downloads').then(r => r.json()).then(d => {
+    const el = document.getElementById('download-count');
+    if (el) el.textContent = d.total || '—';
+  }).catch(() => {});
+
   function copyInstall(btn) {
     navigator.clipboard.writeText('pip install promptlint-cli').then(() => {
       btn.textContent = 'COPIED ✓'
@@ -520,6 +528,10 @@ footer p { font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em; }
       <div class="stat">
         <span class="sn">0</span>
         <span class="sl">API calls needed</span>
+      </div>
+      <div class="stat">
+        <span class="sn" id="download-count">—</span>
+        <span class="sl">downloads</span>
       </div>
     </div>
   </div>
