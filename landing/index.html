@@ -81,7 +81,7 @@ nav .wrap {
   letter-spacing: 0.04em;
   text-decoration: none;
 }
-.logo img { height: 22px; width: auto; }
+.logo .logo-svg { height: 22px; width: auto; flex-shrink: 0; }
 .logo .acc { color: var(--accent); }
 
 .nav-right {
@@ -362,7 +362,7 @@ footer { border-top: 1px solid var(--border-dim); padding: 24px 0; }
 footer .wrap { display: flex; justify-content: space-between; align-items: center; }
 footer p { font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em; }
 .footer-brand { display: flex; align-items: center; gap: 10px; }
-.footer-brand img { height: 16px; width: auto; opacity: 0.5; }
+.footer-brand .footer-logo-svg { height: 16px; width: auto; opacity: 0.5; flex-shrink: 0; }
 .flinks { display: flex; gap: 20px; list-style: none; }
 .flinks a { font-size: 10px; color: var(--text-dim); text-decoration: none; letter-spacing: 0.07em; transition: color 0.15s; }
 .flinks a:hover { color: var(--text-mid); }
@@ -398,7 +398,7 @@ footer p { font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em; }
 
 <nav>
   <div class="wrap">
-    <a href="/" class="logo"><img src="images/pllogo-green.svg" alt="PromptLint logo">promptlint</a>
+    <a href="/" class="logo"><svg class="logo-svg" viewBox="0 0 376.25 388.37" xmlns="http://www.w3.org/2000/svg"><rect fill="#219e6a" width="154.12" height="74.04"/><rect fill="#219e6a" x="154.12" y="74.04" width="74.04" height="74.04"/><rect fill="#219e6a" x="302.2" y="314.32" width="74.04" height="74.04"/><rect fill="#219e6a" x="228.16" width="74.04" height="388.37"/><rect fill="#219e6a" x="80.09" y="148.09" width="74.04" height="240.28"/></svg>promptlint</a>
     <div class="nav-right">
       <a href="#features">features</a>
       <a href="https://github.com/AryaanSheth/promptlint" target="_blank" rel="noopener">github</a>
@@ -547,7 +547,7 @@ footer p { font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em; }
 <footer>
   <div class="wrap">
     <div class="footer-brand">
-      <img src="images/pllogo-green.svg" alt="PromptLint">
+      <svg class="footer-logo-svg" viewBox="0 0 376.25 388.37" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect fill="#219e6a" width="154.12" height="74.04"/><rect fill="#219e6a" x="154.12" y="74.04" width="74.04" height="74.04"/><rect fill="#219e6a" x="302.2" y="314.32" width="74.04" height="74.04"/><rect fill="#219e6a" x="228.16" width="74.04" height="388.37"/><rect fill="#219e6a" x="80.09" y="148.09" width="74.04" height="240.28"/></svg>
       <p>© 2026 PromptLint · built by a dev, for devs</p>
     </div>
     <ul class="flinks">
