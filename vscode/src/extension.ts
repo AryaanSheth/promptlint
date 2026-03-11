@@ -68,8 +68,8 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.languages.createDiagnosticCollection("promptlint");
   context.subscriptions.push(diagCollection);
 
-  const statusBar = new StatusBarManager();
-  context.subscriptions.push(statusBar);
+  const statusBar = currentConfig.showStatusBar ? new StatusBarManager() : null;
+  if (statusBar) context.subscriptions.push(statusBar);
 
   // Re-read config whenever settings change
   context.subscriptions.push(
@@ -104,7 +104,7 @@ export function activate(context: vscode.ExtensionContext) {
       currentConfig.configPath || undefined
     );
     diagCollection.set(doc.uri, diagnostics);
-    if (dashboard) {
+    if (dashboard && statusBar) {
       statusBar.updateFromDashboard(dashboard);
     }
   }
@@ -156,9 +156,19 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand("promptlint.fixAll", async () => {
-      const editor = vscode.window.activeTextEditor;
-      if (!editor) return;
-      await applyFixToDocument(editor);
+      const docs = vscode.workspace.textDocuments.filter(shouldLintDocument);
+      if (docs.length === 0) {
+        vscode.window.showInformationMessage("No prompt files open to fix.");
+        return;
+      }
+      let total = 0;
+      for (const doc of docs) {
+        const editor = await vscode.window.showTextDocument(doc, { preview: false });
+        const before = doc.getText();
+        await applyFixToDocument(editor);
+        if (doc.getText() !== before) total++;
+      }
+      vscode.window.showInformationMessage(`PromptLint: fixed ${total} file(s).`);
     })
   );
 

@@ -4,6 +4,13 @@
   "description": "VS Code extension that runs the promptlint CLI to provide diagnostics and fixes for LLM prompts.",
   "version": "1.0.0",
   "publisher": "opencode",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opencode-ai/promptlint"
+  },
+  "keywords": ["prompt", "llm", "linting", "ai", "gpt", "claude", "gemini", "openai"],
+  "icon": "images/icon.png",
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -12,6 +19,11 @@
   "activationEvents": [
     "onLanguage:plaintext",
     "onLanguage:markdown",
+    "onLanguage:python",
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "onLanguage:json",
+    "onLanguage:yaml",
     "onCommand:promptlint.lint",
     "onCommand:promptlint.fix",
     "onCommand:promptlint.dashboard",
@@ -27,7 +39,7 @@
     "commands": [
       { "command": "promptlint.lint", "title": "PromptLint: Lint File" },
       { "command": "promptlint.fix", "title": "PromptLint: Fix File" },
-      { "command": "promptlint.fixAll", "title": "PromptLint: Fix All File" },
+      { "command": "promptlint.fixAll", "title": "PromptLint: Fix All Files" },
       { "command": "promptlint.dashboard", "title": "PromptLint: Show Dashboard" },
       { "command": "promptlint.explainRule", "title": "PromptLint: Explain Rule" },
       { "command": "promptlint.init", "title": "PromptLint: Initialize Config" }

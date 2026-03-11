@@ -3,6 +3,20 @@
 All notable changes to PromptLint are documented here.  
 This project follows [Semantic Versioning](https://semver.org/).
 
+## 1.1.1 — 2026-03-11
+
+### Fixed (VS Code Extension)
+- **`Fix All Files` was identical to `Fix File`** — `promptlint.fixAll` now iterates all open documents that match the configured languages and applies auto-fixes to each, instead of acting only on the active editor.
+- **`showStatusBar: false` had no effect** — the status bar is no longer created when the setting is disabled.
+- **Missing `activationEvents`** — added `onLanguage` entries for `python`, `javascript`, `typescript`, `json`, and `yaml` so the extension activates automatically on those file types (they were already in the default `languages` list but the extension wouldn't activate until a command was triggered).
+- **Command title typo** — "Fix All File" renamed to "Fix All Files".
+
+### Added (VS Code Extension)
+- `license`, `repository`, `keywords`, and `icon` fields added to the extension manifest, satisfying VS Code Marketplace publishing requirements.
+- `.vscodeignore` now excludes `test-fixtures/` and `package-lock.json` to keep the packaged `.vsix` lean.
+
+---
+
 ## 1.1.0 — 2026-03-10
 
 ### Added
