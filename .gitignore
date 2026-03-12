@@ -52,6 +52,7 @@ Desktop.ini
 # VS Code extension (when added)
 vscode/node_modules/
 vscode/out/
+*.vsix
 
 # Landing (when added)
 landing/node_modules/
