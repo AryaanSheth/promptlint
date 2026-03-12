@@ -58,7 +58,55 @@ const readLimiter = rateLimit({
 });
 app.use('/api/signup-count', readLimiter);
 
+const downloadsLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 120,
+  message: { error: 'Too many requests.' },
+  standardHeaders: true,
+});
+app.use('/api/downloads', downloadsLimiter);
+
 app.use(express.static(path.join(__dirname), { dotfiles: 'deny' }));
+
+const PACKAGE_NAME = 'promptlint-cli';
+let cachedDownloads = null;
+let cachedDownloadsAt = 0;
+const CACHE_MS = 24 * 60 * 60 * 1000;
+
+function formatMsd(n) {
+  if (n === 0) return '0';
+  const magnitude = Math.pow(10, Math.floor(Math.log10(n)));
+  const rounded = Math.floor(n / magnitude) * magnitude;
+  return rounded.toLocaleString() + '+';
+}
+
+app.get('/api/downloads', async (req, res) => {
+  const now = Date.now();
+  if (cachedDownloads && now - cachedDownloadsAt < CACHE_MS) {
+    return res.json(cachedDownloads);
+  }
+  try {
+    const end = new Date();
+    const start = new Date();
+    start.setMonth(start.getMonth() - 6);
+    const startStr = start.toISOString().slice(0, 10);
+    const endStr = end.toISOString().slice(0, 10);
+    const r = await fetch(
+      `https://pypistats.org/api/packages/${PACKAGE_NAME}/overall?start_date=${startStr}&end_date=${endStr}`
+    );
+    const json = await r.json();
+    const data = json.data || [];
+    const total = data
+      .filter((row) => row.category === 'without_mirrors')
+      .reduce((sum, row) => sum + (Number(row.downloads) || 0), 0);
+    cachedDownloads = { total: formatMsd(total) };
+    cachedDownloadsAt = now;
+    res.json(cachedDownloads);
+  } catch (err) {
+    console.error('downloads fetch:', err.message);
+    res.json({ total: '—' });
+  }
+});
 
 app.get('/api/signup-count', async (req, res) => {
   try {
