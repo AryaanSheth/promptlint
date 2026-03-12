@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(xargs ls:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(python3 -c \"from PIL import Image; img = Image.open\\(''c:/Users/aryaa/OneDrive/Desktop/Coding/promptlint/vscode/images/icon.png''\\); print\\(img.size\\)\")",
+      "Bash(python -c \"from PIL import Image; img = Image.open\\(''c:/Users/aryaa/OneDrive/Desktop/Coding/promptlint/vscode/images/icon.png''\\); print\\(img.size\\)\")",
+      "Bash(identify \"c:/Users/aryaa/OneDrive/Desktop/Coding/promptlint/vscode/images/icon.png\")",
+      "Bash(python -c \"import json,sys; p=json.load\\(sys.stdin\\); print\\(''''publisher:'''', p.get\\(''''publisher''''\\)\\); print\\(''''version:'''', p.get\\(''''version''''\\)\\); print\\(''''icon:'''', p.get\\(''''icon''''\\)\\); print\\(''''license:'''', p.get\\(''''license''''\\)\\); print\\(''''repository:'''', p.get\\(''''repository'''',{}\\).get\\(''''url''''\\)\\); print\\(''''description:'''', p.get\\(''''description''''\\)\\)\")"
     ]
   }
 }

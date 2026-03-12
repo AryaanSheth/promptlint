@@ -1,6 +1,6 @@
 # PromptLint VS Code Extension
 
-A VS Code extension that runs the [PromptLint CLI](../cli/) to surface diagnostics, quick fixes, and token cost information for LLM prompts directly in your editor.
+A VS Code extension that runs the [PromptLint CLI](https://github.com/AryaanSheth/promptlint/tree/main/cli) to surface diagnostics, quick fixes, and token cost information for LLM prompts directly in your editor.
 
 ## Features
 

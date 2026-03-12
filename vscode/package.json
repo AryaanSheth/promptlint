@@ -3,11 +3,11 @@
   "displayName": "PromptLint",
   "description": "VS Code extension that runs the promptlint CLI to provide diagnostics and fixes for LLM prompts.",
   "version": "1.0.0",
-  "publisher": "opencode",
+  "publisher": "PromptLint",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/opencode-ai/promptlint"
+    "url": "https://github.com/AryaanSheth/promptlint"
   },
   "keywords": ["prompt", "llm", "linting", "ai", "gpt", "claude", "gemini", "openai"],
   "icon": "images/icon.png",
