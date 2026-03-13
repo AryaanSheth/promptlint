@@ -1,5 +1,10 @@
 ## PromptLint
 
+[![PyPI version](https://img.shields.io/pypi/v/promptlint-cli?color=00ff88&labelColor=0a0a0a)](https://pypi.org/project/promptlint-cli/)
+[![npm version](https://img.shields.io/npm/v/promptlint-cli?color=00ff88&labelColor=0a0a0a)](https://www.npmjs.com/package/promptlint-cli)
+[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/PromptLint.promptlint-vscode?color=00ff88&labelColor=0a0a0a&label=vscode)](https://marketplace.visualstudio.com/items?itemName=PromptLint.promptlint-vscode)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue?labelColor=0a0a0a)](LICENSE)
+
 Static analysis for LLM prompts. Think ESLint, but for the text you send to GPT-4 / Claude / Gemini.
 
 It catches token waste, vague language, prompt injection, missing structure, and a bunch of other things that make prompts worse in production. Runs locally, no API calls, results in milliseconds.
@@ -20,17 +25,19 @@ PromptLint Findings
 
 ### Install
 
-#### Install from PYPI
-```
-pip install promptlint-cli
-```
-
-#### Install Local Build
+**Python (pip)**
 ```bash
 pip install promptlint-cli
 ```
-
 Requires Python 3.9+.
+
+**Node.js (npm)**
+```bash
+npm install -g promptlint-cli
+```
+Requires Node.js 16+.
+
+**VS Code** — [install from the marketplace](https://marketplace.visualstudio.com/items?itemName=PromptLint.promptlint-vscode)
 
 ### Usage
 
@@ -146,12 +153,13 @@ promptlint [FILES...] [OPTIONS]
 ### Repo layout
 
 ```
-cli/            Python CLI (the main package)
-.cursor/skills/ Cursor agent skill (lint-and-fix loop)
-.claude/skills/ Claude Code agent skill
-docs/           Config and rule documentation
+cli/            Python CLI (PyPI: promptlint-cli)
+npm/            Node.js CLI (npm: promptlint-cli)
+vscode/         VS Code extension (Marketplace: PromptLint.promptlint-vscode)
 landing/        Marketing site (Express + Supabase)
-vscode/         VS Code extension (planned)
+docs/           Config and rule documentation
+.claude/skills/ Claude Code agent skill
+.cursor/skills/ Cursor agent skill
 ```
 
 ### Inline ignores

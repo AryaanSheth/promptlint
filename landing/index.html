@@ -149,6 +149,33 @@ nav .wrap {
   margin-bottom: 40px;
 }
 
+/* INSTALL TABS */
+.install-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  width: fit-content;
+}
+.itab {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  padding: 5px 14px;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  border-right: 1px solid var(--border);
+}
+.itab:last-child { border-right: none; }
+.itab:hover { color: var(--text-mid); }
+.itab.active { color: var(--accent); background: rgba(0,255,136,0.06); }
+
 /* INSTALL BLOCK */
 .install-block {
   display: flex;
@@ -389,8 +416,25 @@ footer p { font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em; }
     if (el) el.textContent = d.total || '—';
   }).catch(() => {});
 
+  const installCmds = {
+    pip: 'pip install promptlint-cli',
+    npm: 'npm install -g promptlint-cli'
+  };
+  const installHints = {
+    pip: 'Python 3.9+',
+    npm: 'Node.js 16+'
+  };
+  let activeManager = 'pip';
+
+  function switchPkg(mgr) {
+    activeManager = mgr;
+    document.querySelectorAll('.itab').forEach(b => b.classList.toggle('active', b.dataset.mgr === mgr));
+    document.querySelectorAll('.install-cmd').forEach(el => el.textContent = installCmds[mgr]);
+    document.querySelectorAll('.install-pkg-hint').forEach(el => el.textContent = installHints[mgr]);
+  }
+
   function copyInstall(btn) {
-    navigator.clipboard.writeText('pip install promptlint-cli').then(() => {
+    navigator.clipboard.writeText(installCmds[activeManager]).then(() => {
       btn.textContent = 'COPIED ✓'
       btn.style.background = '#00ff88'
       btn.style.color = '#000'
@@ -412,6 +456,7 @@ footer p { font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em; }
       <a href="#features">features</a>
       <a href="https://github.com/AryaanSheth/promptlint" target="_blank" rel="noopener">github</a>
       <a href="https://pypi.org/project/promptlint-cli/" target="_blank" rel="noopener" class="nav-pill">PYPI</a>
+      <a href="https://www.npmjs.com/package/promptlint-cli" target="_blank" rel="noopener" class="nav-pill">NPM</a>
       <a href="https://marketplace.visualstudio.com/items?itemName=PromptLint.promptlint-vscode" target="_blank" rel="noopener" class="nav-pill">VSCODE</a>
     </div>
   </div>
@@ -425,12 +470,16 @@ footer p { font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em; }
       A static analyzer for LLM prompts. Catches injection attacks, token waste,
       and structural issues before they hit production — zero API calls, zero latency.
     </p>
+    <div class="install-tabs">
+      <button class="itab active" data-mgr="pip" onclick="switchPkg('pip')">pip</button>
+      <button class="itab" data-mgr="npm" onclick="switchPkg('npm')">npm</button>
+    </div>
     <div class="install-block">
       <span class="install-prompt">$</span>
       <code class="install-cmd">pip install promptlint-cli</code>
       <button class="install-copy" onclick="copyInstall(this)">COPY</button>
     </div>
-    <p class="form-hint">[*] Python 3.9+ &nbsp;·&nbsp; Apache 2.0 &nbsp;·&nbsp; <a href="https://pypi.org/project/promptlint-cli/" target="_blank" rel="noopener">view on PyPI</a></p>
+    <p class="form-hint">[*] <span class="install-pkg-hint">Python 3.9+</span> &nbsp;·&nbsp; Apache 2.0 &nbsp;·&nbsp; <a href="https://pypi.org/project/promptlint-cli/" target="_blank" rel="noopener">PyPI</a> &nbsp;·&nbsp; <a href="https://www.npmjs.com/package/promptlint-cli" target="_blank" rel="noopener">npm</a></p>
     <div class="cta-links">
       <a href="https://marketplace.visualstudio.com/items?itemName=PromptLint.promptlint-vscode" target="_blank" rel="noopener">↗ VS Code Extension</a>
       <span class="cta-sep">·</span>
@@ -549,7 +598,11 @@ footer p { font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em; }
 <section class="cta-section">
   <div class="wrap">
     <h2>Get started in seconds.</h2>
-    <p>Install the CLI or grab the VS Code extension — both are free.</p>
+    <p>Install the CLI or grab the VS Code extension — everything is free.</p>
+    <div class="install-tabs">
+      <button class="itab active" data-mgr="pip" onclick="switchPkg('pip')">pip</button>
+      <button class="itab" data-mgr="npm" onclick="switchPkg('npm')">npm</button>
+    </div>
     <div class="install-block">
       <span class="install-prompt">$</span>
       <code class="install-cmd">pip install promptlint-cli</code>
@@ -557,6 +610,8 @@ footer p { font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em; }
     </div>
     <div class="cta-links">
       <a href="https://pypi.org/project/promptlint-cli/" target="_blank" rel="noopener">PyPI</a>
+      <span class="cta-sep">·</span>
+      <a href="https://www.npmjs.com/package/promptlint-cli" target="_blank" rel="noopener">npm</a>
       <span class="cta-sep">·</span>
       <a href="https://marketplace.visualstudio.com/items?itemName=PromptLint.promptlint-vscode" target="_blank" rel="noopener">VS Code Extension</a>
       <span class="cta-sep">·</span>
@@ -576,6 +631,7 @@ footer p { font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em; }
     <ul class="flinks">
       <li><a href="https://github.com/AryaanSheth/promptlint" target="_blank" rel="noopener">github</a></li>
       <li><a href="https://pypi.org/project/promptlint-cli/" target="_blank" rel="noopener">pypi</a></li>
+      <li><a href="https://www.npmjs.com/package/promptlint-cli" target="_blank" rel="noopener">npm</a></li>
       <li><a href="https://marketplace.visualstudio.com/items?itemName=PromptLint.promptlint-vscode" target="_blank" rel="noopener">vscode</a></li>
     </ul>
   </div>
