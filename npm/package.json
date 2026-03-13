@@ -1,0 +1,49 @@
+{
+  "name": "promptlint",
+  "version": "1.0.0",
+  "description": "Static analysis for LLM prompts — catch cost waste, quality issues, and injection risks",
+  "keywords": ["llm", "prompt", "linter", "static-analysis", "prompt-injection", "gpt", "claude", "ai", "openai"],
+  "author": "Aryaan Sheth",
+  "license": "Apache-2.0",
+  "homepage": "https://promptlint.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AryaanSheth/promptlint.git",
+    "directory": "npm"
+  },
+  "bugs": {
+    "url": "https://github.com/AryaanSheth/promptlint/issues"
+  },
+  "bin": {
+    "promptlint": "./dist/cli.js"
+  },
+  "main": "./dist/engine.js",
+  "types": "./dist/engine.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/engine.d.ts",
+      "default": "./dist/engine.js"
+    }
+  },
+  "files": [
+    "dist/",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=16"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0"
+  }
+}

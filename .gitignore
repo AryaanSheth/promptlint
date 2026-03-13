@@ -54,6 +54,10 @@ vscode/node_modules/
 vscode/out/
 *.vsix
 
+# npm CLI package
+npm/node_modules/
+npm/dist/
+
 # Landing (when added)
 landing/node_modules/
 landing/dist/
