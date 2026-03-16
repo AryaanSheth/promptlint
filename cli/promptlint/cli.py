@@ -374,10 +374,6 @@ def _fix_redundancy(text: str) -> str:
     return _normalize_spacing_and_punctuation(updated)
 
 
-def _strengthen_verbs(text: str) -> str:
-    return text
-
-
 # ── Severity / exit-code helpers ────────────────────────────────────────
 
 
@@ -428,8 +424,6 @@ def _run_lint_on_text(
             )
         if config_data.fix_rules.get("verbosity-redundancy", True):
             optimized_prompt = _fix_redundancy(optimized_prompt)
-        if config_data.fix_rules.get("actionability-weak-verbs", True):
-            optimized_prompt = _strengthen_verbs(optimized_prompt)
         if config_data.fix_rules.get("structure-scaffold", True):
             optimized_prompt = _apply_structure_scaffold(
                 optimized_prompt, config_data.required_tags
