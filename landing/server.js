@@ -140,15 +140,20 @@ app.post('/api/signup', async (req, res) => {
         .send({
           from: fromEmail,
           to: email,
-          subject: 'You\u2019re on the PromptLint waitlist',
+          subject: 'Welcome to PromptLint',
           text: [
-            'Thanks for joining the PromptLint waitlist!',
+            'Thanks for signing up!',
             '',
-            'We\u2019ll email you when:',
-            '- the VS Code extension is live, and',
-            '- the CLI hits v1.',
+            'Get started in 30 seconds:',
             '',
-            '\u2014 The PromptLint team',
+            '  pip install promptlint-cli',
+            '  promptlint --file your-prompt.txt',
+            '',
+            'VS Code extension: https://marketplace.visualstudio.com/items?itemName=PromptLint.promptlint-vscode',
+            'GitHub: https://github.com/AryaanSheth/promptlint',
+            '',
+            'Reply to this email with questions \u2014 I read every one.',
+            '\u2014 Aryaan',
           ].join('\n'),
         })
         .catch((err) => {
