@@ -29,7 +29,7 @@ class TestVersionAndHelp:
     def test_version(self):
         r = run("--version")
         assert r.returncode == 0
-        assert "1.0.0" in r.stdout
+        assert "1.0.2" in r.stdout
 
     def test_help(self):
         r = run("--help")

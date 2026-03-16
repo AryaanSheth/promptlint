@@ -1,7 +1,6 @@
 import * as vscode from "vscode";
 
 export interface PromptLintConfig {
-  pythonPath: string;
   lintOnSave: boolean;
   lintOnType: boolean;
   lintOnTypeDelay: number;
@@ -13,7 +12,6 @@ export interface PromptLintConfig {
 
 export function getConfig(): PromptLintConfig {
   const cfg = vscode.workspace.getConfiguration("promptlint");
-  const pythonPath = cfg.get<string>("pythonPath", "python");
   const lintOnSave = cfg.get<boolean>("lintOnSave", true);
   const lintOnType = cfg.get<boolean>("lintOnType", false);
   const lintOnTypeDelay = cfg.get<number>("lintOnTypeDelay", 500);
@@ -22,7 +20,6 @@ export function getConfig(): PromptLintConfig {
   const failLevel = cfg.get<"none"|"warn"|"critical">("failLevel", "critical");
   const showStatusBar = cfg.get<boolean>("showStatusBar", true);
   return {
-    pythonPath,
     lintOnSave,
     lintOnType,
     lintOnTypeDelay,

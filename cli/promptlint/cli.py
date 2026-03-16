@@ -27,8 +27,6 @@ token_limit: 800
 cost_per_1k_tokens: 0.005
 calls_per_day: 10000
 
-structure_style: auto
-
 display:
   preview_length: 60
   context_width: 80

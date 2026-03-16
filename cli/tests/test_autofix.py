@@ -8,7 +8,6 @@ from promptlint.cli import (
     _remove_injection_content,
     _apply_structure_scaffold,
     _fix_redundancy,
-    _strengthen_verbs,
 )
 
 
@@ -122,8 +121,3 @@ class TestFixRedundancy:
         assert "sort" in result.lower()
 
 
-class TestStrengthenVerbs:
-    def test_is_noop_stub(self):
-        text = "Do something with the data"
-        result = _strengthen_verbs(text)
-        assert result == text

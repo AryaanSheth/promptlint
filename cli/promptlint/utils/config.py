@@ -53,11 +53,9 @@ class PromptlintConfig:
             "you are now a [a-zA-Z ]+",
         ]
     )
-    structure_style: str = "auto"
     required_tags: List[str] = field(
         default_factory=lambda: ["task", "context", "output_format"]
     )
-    delimiters: List[str] = field(default_factory=lambda: ["```", "---"])
     fix_enabled: bool = True
     fix_rules: Dict[str, bool] = field(
         default_factory=lambda: {
@@ -65,7 +63,6 @@ class PromptlintConfig:
             "prompt-injection": True,
             "structure-scaffold": True,
             "verbosity-redundancy": True,
-            "actionability-weak-verbs": True,
         }
     )
 
@@ -90,9 +87,6 @@ class PromptlintConfig:
         politeness_cfg = _get_rule_cfg(rules_cfg, "politeness_bloat", "politeness-bloat")
         injection_cfg = _get_rule_cfg(rules_cfg, "prompt_injection", "prompt-injection")
         structure_tags_cfg = _get_rule_cfg(rules_cfg, "structure_tags", "structure-tags")
-        structure_delim_cfg = _get_rule_cfg(
-            rules_cfg, "structure_delimiters", "structure-delimiters"
-        )
 
         fix_enabled = fix_cfg.get("enabled")
         if not isinstance(fix_enabled, bool):
@@ -128,7 +122,6 @@ class PromptlintConfig:
             preview_length=preview_length,
             context_width=context_width,
             enabled_rules=enabled_rules,
-            structure_style=str(data.get("structure_style", cls.structure_style)),
             politeness_words=_coerce_list(
                 politeness_cfg.get("words"), cls().politeness_words
             ),
@@ -145,9 +138,6 @@ class PromptlintConfig:
             injection_patterns=validated_patterns,
             required_tags=_coerce_list(
                 structure_tags_cfg.get("required_tags"), cls().required_tags
-            ),
-            delimiters=_coerce_list(
-                structure_delim_cfg.get("delimiters"), cls().delimiters
             ),
             fix_enabled=fix_enabled,
             fix_rules=fix_rules,
@@ -194,13 +184,6 @@ def _coerce_list(value: Any, default: List[str]) -> List[str]:
 def _coerce_float(value: Any, default: float) -> float:
     try:
         return float(value)
-    except (TypeError, ValueError):
-        return default
-
-
-def _coerce_int(value: Any, default: int) -> int:
-    try:
-        return int(value)
     except (TypeError, ValueError):
         return default
 
