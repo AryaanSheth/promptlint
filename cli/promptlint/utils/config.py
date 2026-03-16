@@ -56,6 +56,7 @@ class PromptlintConfig:
     required_tags: List[str] = field(
         default_factory=lambda: ["task", "context", "output_format"]
     )
+    custom_term_pairs: List[List[str]] = field(default_factory=list)
     fix_enabled: bool = True
     fix_rules: Dict[str, bool] = field(
         default_factory=lambda: {
@@ -87,6 +88,7 @@ class PromptlintConfig:
         politeness_cfg = _get_rule_cfg(rules_cfg, "politeness_bloat", "politeness-bloat")
         injection_cfg = _get_rule_cfg(rules_cfg, "prompt_injection", "prompt-injection")
         structure_tags_cfg = _get_rule_cfg(rules_cfg, "structure_tags", "structure-tags")
+        consistency_cfg = _get_rule_cfg(rules_cfg, "consistency_terminology", "consistency-terminology")
 
         fix_enabled = fix_cfg.get("enabled")
         if not isinstance(fix_enabled, bool):
@@ -139,6 +141,7 @@ class PromptlintConfig:
             required_tags=_coerce_list(
                 structure_tags_cfg.get("required_tags"), cls().required_tags
             ),
+            custom_term_pairs=_coerce_term_pairs(consistency_cfg.get("custom_pairs")),
             fix_enabled=fix_enabled,
             fix_rules=fix_rules,
         )
@@ -202,6 +205,19 @@ def _clamp_float(value: Any, lo: float, hi: float, default: float) -> float:
     except (TypeError, ValueError):
         return default
     return max(lo, min(v, hi))
+
+
+def _coerce_term_pairs(value: Any) -> List[List[str]]:
+    """Parse custom_pairs: list of lists of strings."""
+    if not isinstance(value, list):
+        return []
+    result: List[List[str]] = []
+    for item in value:
+        if isinstance(item, list) and len(item) >= 2:
+            pair = [str(s).strip() for s in item if str(s).strip()]
+            if len(pair) >= 2:
+                result.append(pair)
+    return result
 
 
 def _validate_regex_patterns(patterns: List[str]) -> List[str]:

@@ -97,10 +97,10 @@ def check_clarity(text: str, config: PromptlintConfig) -> List[Dict[str, object]
         return results
 
     vague_patterns = [
-        (r"\b(some|several|various|many|few|stuff|things|etc)\b", "vague quantifier"),
-        (r"\b(maybe|perhaps|possibly|probably|might|could)\b", "uncertain language"),
-        (r"\b(good|bad|nice|better|best)\b", "subjective term without criteria"),
-        (r"\b(appropriate|suitable|relevant|proper)\b", "undefined standard"),
+        (r"\b(some|several|various|many|few)\b", "vague quantifier — specify a number or range"),
+        (r"\b(stuff|things|etc|and so on|and more)\b", "trailing vague catch-all — enumerate explicitly"),
+        (r"\b(somehow|somewhere|sometime)\b", "unspecified manner/place/time"),
+        (r"\bmaybe\b(?!\s+(?:null|undefined|none|empty))", "uncertain language in an instruction context"),
     ]
 
     for pattern, issue_type in vague_patterns:
@@ -159,7 +159,9 @@ def check_verbosity(text: str, config: PromptlintConfig) -> List[Dict[str, objec
     results: List[Dict[str, object]] = []
 
     if config.enabled_rules.get("verbosity-sentence-length", True):
-        sentences = re.split(r'[.!?]+', text)
+        # Split on sentence-ending punctuation followed by whitespace + capital letter,
+        # avoiding splits on abbreviations (e.g., i.e., v1.0, decimals).
+        sentences = re.split(r'(?<=[^A-Z\d][.!?])\s+(?=[A-Z])|(?<=[.!?]{2})\s+', text)
         for sentence in sentences:
             words = sentence.split()
             if len(words) > 40:
@@ -176,13 +178,47 @@ def check_verbosity(text: str, config: PromptlintConfig) -> List[Dict[str, objec
 
     if config.enabled_rules.get("verbosity-redundancy", True):
         redundant_patterns = [
-            r"\b(in order to)\b",
-            r"\b(due to the fact that)\b",
-            r"\b(at this point in time)\b",
-            r"\b(for the purpose of)\b",
-            r"\b(in the event that)\b",
-            r"\b(prior to)\b",
-            r"\b(subsequent to)\b",
+            r"\bin order to\b",
+            r"\bdue to the fact that\b",
+            r"\bat this point in time\b",
+            r"\bfor the purpose of\b",
+            r"\bin the event that\b",
+            r"\bprior to\b",
+            r"\bsubsequent to\b",
+            r"\ba total of\b",
+            r"\beach and every\b",
+            r"\bfirst and foremost\b",
+            r"\bfuture plans\b",
+            r"\bpast history\b",
+            r"\bend result\b",
+            r"\bbasic fundamentals\b",
+            r"\bclose proximity\b",
+            r"\bgather together\b",
+            r"\bjoin together\b",
+            r"\brefer back\b",
+            r"\breturn back\b",
+            r"\bunexpected surprise\b",
+            r"\bcompletely eliminate\b",
+            r"\bcompletely finished\b",
+            r"\badvance planning\b",
+            r"\bpast experience\b",
+            r"\bnew innovation\b",
+            r"\bpersonal opinion\b",
+            r"\brepeat again\b",
+            r"\bstill remains\b",
+            r"\btrue fact\b",
+            r"\bwith the exception of\b",
+            r"\bin close proximity to\b",
+            r"\bhas the ability to\b",
+            r"\bis able to\b",
+            r"\bin spite of the fact that\b",
+            r"\bwith regard to\b",
+            r"\bin relation to\b",
+            r"\bfor the reason that\b",
+            r"\bin the near future\b",
+            r"\bat the present time\b",
+            r"\buntil such time as\b",
+            r"\bon a (?:daily|weekly|monthly) basis\b",
         ]
 
         for pattern in redundant_patterns:
@@ -202,21 +238,43 @@ def check_verbosity(text: str, config: PromptlintConfig) -> List[Dict[str, objec
     return results
 
 
+_WEAK_VERB_PATTERNS = [
+    (r"\b(consider|try to|attempt to|endeavor to)\b", "weak directive — use imperative form"),
+    (r"\byou might want to\b", "hedged instruction — use direct imperative"),
+    (r"\bfeel free to\b", "unnecessary hedge — remove"),
+    (r"\bit would be (?:good|nice|helpful|great) (?:if|to)\b", "indirect instruction — state directly"),
+    (r"\bif possible\b", "conditional hedge — commit to the instruction"),
+    (r"\bwhenever (?:possible|you can)\b", "weak conditional — use 'always' or state the condition explicitly"),
+]
+
+
 def check_actionability(text: str, config: PromptlintConfig) -> List[Dict[str, object]]:
     results: List[Dict[str, object]] = []
 
     if not config.enabled_rules.get("actionability-weak-verbs", True):
         return results
 
-    passive_pattern = r"\b(is|are|was|were|be|been|being)\s+\w+ed\b"
-    matches = list(re.finditer(passive_pattern, text, re.IGNORECASE))
+    for pattern, issue_type in _WEAK_VERB_PATTERNS:
+        for match in re.finditer(pattern, text, re.IGNORECASE):
+            results.append(
+                {
+                    "level": "INFO",
+                    "rule": "actionability-weak-verbs",
+                    "message": f"Weak directive '{match.group(0)}' ({issue_type}).",
+                    "line": _line_number(text, match.start()),
+                    "context": _line_context(text, match.start(), config.context_width),
+                }
+            )
 
-    if len(matches) > 3:
+    passive_pattern = r"\b(is|are|was|were|be|been|being)\s+\w+ed\b"
+    passive_matches = list(re.finditer(passive_pattern, text, re.IGNORECASE))
+
+    if len(passive_matches) > 5:
         results.append(
             {
                 "level": "INFO",
                 "rule": "actionability-weak-verbs",
-                "message": f"Multiple passive voice constructions ({len(matches)}) detected. Use active voice for clarity.",
+                "message": f"Multiple passive voice constructions ({len(passive_matches)}) detected. Use active voice for clarity.",
                 "line": "-",
                 "context": _preview(text, config.preview_length),
             }
@@ -225,34 +283,49 @@ def check_actionability(text: str, config: PromptlintConfig) -> List[Dict[str, o
     return results
 
 
+_BUILTIN_TERM_PAIRS = [
+    (r"\buser\b", r"\bcustomer\b"),
+    (r"\bfunction\b", r"\bmethod\b"),
+    (r"\berror\b", r"\bexception\b"),
+    (r"\bAI\b", r"\bmodel\b"),
+    (r"\bLLM\b", r"\bmodel\b"),
+    (r"\bquery\b", r"\brequest\b"),
+    (r"\bresponse\b", r"\breply\b"),
+    (r"\boutput\b", r"\bresult\b"),
+    (r"\bprompt\b", r"\bmessage\b"),
+    (r"\bsystem prompt\b", r"\binstruction\b"),
+    (r"\btask\b", r"\bgoal\b"),
+    (r"\bagent\b", r"\bassistant\b"),
+]
+
+
 def check_consistency(text: str, config: PromptlintConfig) -> List[Dict[str, object]]:
     results: List[Dict[str, object]] = []
 
     if not config.enabled_rules.get("consistency-terminology", True):
         return results
 
-    mixed_terms = [
-        (r"\buser\b", r"\bcustomer\b"),
-        (r"\bfunction\b", r"\bmethod\b"),
-        (r"\berror\b", r"\bexception\b"),
-    ]
-
-    for term1_pattern, term2_pattern in mixed_terms:
-        has_term1 = bool(re.search(term1_pattern, text, re.IGNORECASE))
-        has_term2 = bool(re.search(term2_pattern, text, re.IGNORECASE))
-
-        if has_term1 and has_term2:
-            term1 = re.search(term1_pattern, text, re.IGNORECASE).group(0)
-            term2 = re.search(term2_pattern, text, re.IGNORECASE).group(0)
+    def _check_pair(p1: str, p2: str) -> None:
+        m1 = re.search(p1, text, re.IGNORECASE)
+        m2 = re.search(p2, text, re.IGNORECASE)
+        if m1 and m2:
             results.append(
                 {
                     "level": "INFO",
                     "rule": "consistency-terminology",
-                    "message": f"Mixed terminology: '{term1}' and '{term2}'. Use one term consistently.",
+                    "message": f"Mixed terminology: '{m1.group(0)}' and '{m2.group(0)}'. Use one term consistently.",
                     "line": "-",
                     "context": _preview(text, config.preview_length),
                 }
             )
+
+    for p1, p2 in _BUILTIN_TERM_PAIRS:
+        _check_pair(p1, p2)
+
+    for group in config.custom_term_pairs:
+        for i in range(len(group)):
+            for j in range(i + 1, len(group)):
+                _check_pair(rf"\b{re.escape(group[i])}\b", rf"\b{re.escape(group[j])}\b")
 
     return results
 

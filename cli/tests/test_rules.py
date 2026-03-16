@@ -253,9 +253,9 @@ class TestClarityRule:
         results = check_clarity("Maybe use a for loop", default_config)
         assert any("maybe" in r["message"].lower() for r in results)
 
-    def test_subjective_terms(self, default_config):
-        results = check_clarity("Write good code", default_config)
-        assert any("good" in r["message"].lower() for r in results)
+    def test_vague_quantifier(self, default_config):
+        results = check_clarity("Handle several edge cases", default_config)
+        assert any("several" in r["message"].lower() for r in results)
 
 
 # ── Specificity ─────────────────────────────────────────────────────────
@@ -305,11 +305,15 @@ class TestActionabilityRule:
         text = (
             "The data is processed. The output is generated. "
             "The file is created. The error is handled. "
-            "The result is returned."
+            "The result is returned. The config is loaded. "
+            "The schema is validated."
         )
         results = check_actionability(text, default_config)
-        assert len(results) == 1
-        assert results[0]["rule"] == "actionability-weak-verbs"
+        assert any(r["rule"] == "actionability-weak-verbs" for r in results)
+
+    def test_detects_weak_verbs(self, default_config):
+        results = check_actionability("Feel free to ask follow-up questions.", default_config)
+        assert any(r["rule"] == "actionability-weak-verbs" for r in results)
 
     def test_active_voice_no_findings(self, default_config):
         results = check_actionability("Process the data and return the result.", default_config)

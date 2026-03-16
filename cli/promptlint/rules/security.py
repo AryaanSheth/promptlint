@@ -68,8 +68,10 @@ def check_injection(text: str, config: PromptlintConfig) -> List[Dict[str, objec
     for pattern in config.injection_patterns:
         try:
             match = re.search(pattern, text, re.IGNORECASE)
+            from_normalized = False
             if not match:
                 match = re.search(pattern, normalized, re.IGNORECASE)
+                from_normalized = True
         except re.error as exc:
             print(
                 f"[promptlint] WARNING: Skipping bad injection pattern '{pattern}': {exc}",
@@ -79,7 +81,7 @@ def check_injection(text: str, config: PromptlintConfig) -> List[Dict[str, objec
         if match:
             line_num = _line_number(text, min(match.start(), len(text) - 1)) if text else 1
             ctx = _line_context(text, min(match.start(), len(text) - 1), config.context_width) if text else ""
-            obfuscated = match.string != text
+            obfuscated = from_normalized
             msg = f"Injection pattern detected: '{pattern}'."
             if obfuscated:
                 msg = f"Obfuscated injection pattern detected: '{pattern}' (after normalizing leetspeak/unicode)."
@@ -92,6 +94,5 @@ def check_injection(text: str, config: PromptlintConfig) -> List[Dict[str, objec
                     "context": ctx,
                 }
             )
-            break
 
     return results
