@@ -59,6 +59,10 @@
       }
     }
   },
+  "dependencies": {
+    "promptlint-cli": "file:../npm",
+    "js-yaml": "^4.1.0"
+  },
   "devDependencies": {
     "@types/node": "^18.14.0",
     "@types/vscode": "^1.80.0",

@@ -1,10 +1,8 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
-import * as os from "os";
 import * as path from "path";
-import { execFile } from "child_process";
 import { getConfig, PromptLintConfig } from "./config";
-import { lintDocument, extractRegions, stripCodeWrapper } from "./linter";
+import { lintDocument, lintText, fixText, extractRegions, stripCodeWrapper } from "./linter";
 import { StatusBarManager } from "./statusBar";
 import { PromptLintCodeActionProvider } from "./codeActions";
 
@@ -28,38 +26,82 @@ function shouldLintDocument(doc: vscode.TextDocument): boolean {
   );
 }
 
-function createTempFile(text: string, suffix: string = ".txt"): string | null {
-  const tmpFile = path.join(
-    os.tmpdir(),
-    `promptlint_${Date.now()}_${Math.random().toString(36).slice(2)}${suffix}`
-  );
-  try {
-    fs.writeFileSync(tmpFile, text, { encoding: "utf8" });
-    return tmpFile;
-  } catch {
-    return null;
+/** Resolve the effective .promptlintrc path for a given document. */
+function resolveConfigPath(configPath: string, docFsPath: string): string | undefined {
+  if (configPath) return configPath;
+  const workspaceRoot = vscode.workspace.getWorkspaceFolder(
+    vscode.Uri.file(docFsPath)
+  )?.uri?.fsPath;
+  if (workspaceRoot) {
+    for (const name of [".promptlintrc", ".promptlintrc.yml", ".promptlintrc.yaml"]) {
+      const p = path.join(workspaceRoot, name);
+      if (fs.existsSync(p)) return p;
+    }
   }
+  return undefined;
 }
 
-function runCli(
-  args: string[],
-  cwd?: string
-): Promise<{ stdout: string; stderr: string }> {
-  const pythonPath = currentConfig.pythonPath;
-  return new Promise((resolve, reject) => {
-    execFile(
-      pythonPath,
-      ["-m", "promptlint", ...args],
-      { maxBuffer: 5 * 1024 * 1024, cwd },
-      (err, stdout, stderr) => {
-        if (err && err.code !== 1 && err.code !== 2) {
-          return reject(err);
-        }
-        resolve({ stdout: stdout || "", stderr: stderr || "" });
-      }
-    );
-  });
-}
+const RULE_DOCS: Record<string, string> = {
+  "cost": "Reports token count and estimated cost per call for your prompt.",
+  "cost-limit": "Warns when your prompt exceeds the configured token limit.",
+  "prompt-injection": "Detects prompt injection patterns that could override your instructions.",
+  "structure-sections": "Checks for required structural tags (e.g. <task>, <context>).",
+  "clarity-vague-terms": "Flags vague language that reduces precision (e.g. 'something', 'somehow').",
+  "specificity-examples": "Suggests adding examples when none are present in longer prompts.",
+  "specificity-constraints": "Checks for explicit output constraints (format, length, etc.).",
+  "politeness-bloat": "Identifies politeness words (please, kindly) that add tokens without semantic value.",
+  "verbosity-sentence-length": "Flags overly long sentences that could be split for clarity.",
+  "verbosity-redundancy": "Detects wordy phrases replaceable with concise alternatives.",
+  "actionability-weak-verbs": "Flags weak verbs (consider, try, look into) that reduce prompt directiveness.",
+  "consistency-terminology": "Detects inconsistent terminology used for the same concept.",
+  "completeness-edge-cases": "Checks whether the prompt addresses edge cases and unexpected inputs.",
+};
+
+const STARTER_CONFIG = `model: gpt-4o
+token_limit: 800
+cost_per_1k_tokens: 0.005
+calls_per_day: 10000
+
+display:
+  preview_length: 60
+  context_width: 80
+
+rules:
+  cost:
+    enabled: true
+  cost_limit:
+    enabled: true
+  prompt_injection:
+    enabled: true
+  structure_sections:
+    enabled: true
+  clarity_vague_terms:
+    enabled: true
+  specificity_examples:
+    enabled: true
+  specificity_constraints:
+    enabled: true
+  politeness_bloat:
+    enabled: true
+    allow_politeness: false
+  verbosity_sentence_length:
+    enabled: true
+  verbosity_redundancy:
+    enabled: true
+  actionability_weak_verbs:
+    enabled: true
+  consistency_terminology:
+    enabled: true
+  completeness_edge_cases:
+    enabled: true
+
+fix:
+  enabled: true
+  prompt_injection: true
+  politeness_bloat: true
+  verbosity_redundancy: true
+  structure_scaffold: true
+`;
 
 export function activate(context: vscode.ExtensionContext) {
   currentConfig = getConfig();
@@ -71,7 +113,6 @@ export function activate(context: vscode.ExtensionContext) {
   const statusBar = currentConfig.showStatusBar ? new StatusBarManager() : null;
   if (statusBar) context.subscriptions.push(statusBar);
 
-  // Re-read config whenever settings change
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("promptlint")) {
@@ -80,7 +121,6 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Register code action provider for all configured languages
   const codeActionProvider = new PromptLintCodeActionProvider();
   for (const lang of currentConfig.languages) {
     context.subscriptions.push(
@@ -92,17 +132,11 @@ export function activate(context: vscode.ExtensionContext) {
     );
   }
 
-  // Check CLI availability on activation
-  checkCLI();
-
   // --- Lint helpers ---
 
   async function lintDoc(doc: vscode.TextDocument) {
-    const { diagnostics, dashboard } = await lintDocument(
-      doc,
-      currentConfig.pythonPath,
-      currentConfig.configPath || undefined
-    );
+    const cfgPath = resolveConfigPath(currentConfig.configPath, doc.uri.fsPath);
+    const { diagnostics, dashboard } = await lintDocument(doc, cfgPath);
     diagCollection.set(doc.uri, diagnostics);
     if (dashboard && statusBar) {
       statusBar.updateFromDashboard(dashboard);
@@ -178,28 +212,16 @@ export function activate(context: vscode.ExtensionContext) {
       async (uri: vscode.Uri, range: vscode.Range, _rule: string) => {
         const doc = await vscode.workspace.openTextDocument(uri);
         const regionText = doc.getText(range);
-        const tmpFile = createTempFile(regionText);
-        if (!tmpFile) return;
+        const cfgPath = resolveConfigPath(currentConfig.configPath, uri.fsPath);
         try {
-          const { stdout } = await runCli([
-            "-f",
-            tmpFile,
-            "--fix",
-            "--format",
-            "json",
-          ]);
-          const res = JSON.parse(stdout || "{}");
-          if (res.optimized_prompt) {
+          const fixed = fixText(regionText, cfgPath);
+          if (fixed && fixed !== regionText) {
             const wsEdit = new vscode.WorkspaceEdit();
-            wsEdit.replace(uri, range, res.optimized_prompt);
+            wsEdit.replace(uri, range, fixed);
             await vscode.workspace.applyEdit(wsEdit);
           }
         } catch {
           // silently ignore
-        } finally {
-          try {
-            fs.unlinkSync(tmpFile);
-          } catch {}
         }
       }
     )
@@ -230,17 +252,12 @@ export function activate(context: vscode.ExtensionContext) {
         out.appendLine("Open a prompt file and run lint first.");
         return;
       }
-      const tmpFile = createTempFile(editor.document.getText());
-      if (!tmpFile) return;
       try {
-        const { stdout } = await runCli([
-          "-f",
-          tmpFile,
-          "--format",
-          "json",
-          "--show-dashboard",
-        ]);
-        const res = JSON.parse(stdout || "{}");
+        const cfgPath = resolveConfigPath(
+          currentConfig.configPath,
+          editor.document.uri.fsPath
+        );
+        const res = lintText(editor.document.getText(), cfgPath);
         const d = res.dashboard;
         if (d) {
           out.appendLine(`Current Tokens:     ${d.current_tokens}`);
@@ -257,56 +274,24 @@ export function activate(context: vscode.ExtensionContext) {
         } else {
           out.appendLine("No dashboard data available.");
         }
-      } catch {
-        out.appendLine("Failed to run promptlint CLI.");
-      } finally {
-        try {
-          fs.unlinkSync(tmpFile);
-        } catch {}
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "unknown error";
+        out.appendLine(`Failed to run promptlint: ${msg}`);
       }
     })
   );
 
   context.subscriptions.push(
     vscode.commands.registerCommand("promptlint.explainRule", async () => {
-      let rules: string[];
-      try {
-        const { stdout } = await runCli(["--list-rules"]);
-        rules = parseRuleIds(stdout);
-      } catch {
-        rules = [];
-      }
-      if (rules.length === 0) {
-        rules = [
-          "cost",
-          "cost-limit",
-          "prompt-injection",
-          "structure-sections",
-          "clarity-vague-terms",
-          "specificity-examples",
-          "specificity-constraints",
-          "politeness-bloat",
-          "verbosity-sentence-length",
-          "verbosity-redundancy",
-          "actionability-weak-verbs",
-          "consistency-terminology",
-          "completeness-edge-cases",
-        ];
-      }
+      const rules = Object.keys(RULE_DOCS);
       const pick = await vscode.window.showQuickPick(rules, {
         placeHolder: "Select a rule to explain",
       });
       if (!pick) return;
-      try {
-        const { stdout } = await runCli(["--explain", pick]);
-        const out = vscode.window.createOutputChannel("PromptLint Rule");
-        out.show(true);
-        out.appendLine(stdout);
-      } catch {
-        vscode.window.showErrorMessage(
-          `Failed to explain rule '${pick}'. Is promptlint CLI installed?`
-        );
-      }
+      const out = vscode.window.createOutputChannel("PromptLint Rule");
+      out.show(true);
+      out.appendLine(`Rule: ${pick}\n`);
+      out.appendLine(RULE_DOCS[pick] ?? "No documentation available.");
     })
   );
 
@@ -314,40 +299,33 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("promptlint.init", async () => {
       const root =
         vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath ?? process.cwd();
+      const configFile = path.join(root, ".promptlintrc");
       try {
-        await runCli(["--init"], root);
+        if (fs.existsSync(configFile)) {
+          vscode.window.showInformationMessage(
+            ".promptlintrc already exists in workspace root."
+          );
+          return;
+        }
+        fs.writeFileSync(configFile, STARTER_CONFIG, { encoding: "utf8" });
         vscode.window.showInformationMessage(
           "Created .promptlintrc in workspace root."
         );
       } catch {
-        vscode.window.showErrorMessage(
-          "promptlint --init failed. Ensure CLI is installed."
-        );
+        vscode.window.showErrorMessage("Failed to create .promptlintrc.");
       }
     })
   );
 
   // --- Fix helper ---
 
-  async function fixPromptText(text: string): Promise<string | null> {
-    const tmpFile = createTempFile(text);
-    if (!tmpFile) return null;
+  function fixPromptText(text: string, docFsPath: string): string | null {
+    const cfgPath = resolveConfigPath(currentConfig.configPath, docFsPath);
     try {
-      const { stdout } = await runCli([
-        "-f",
-        tmpFile,
-        "--fix",
-        "--format",
-        "json",
-      ]);
-      const res = JSON.parse(stdout || "{}");
-      return res.optimized_prompt ?? null;
+      const fixed = fixText(text, cfgPath);
+      return fixed !== text ? fixed : null;
     } catch {
       return null;
-    } finally {
-      try {
-        fs.unlinkSync(tmpFile);
-      } catch {}
     }
   }
 
@@ -361,9 +339,10 @@ export function activate(context: vscode.ExtensionContext) {
         const match = l.match(/^(\s*)/);
         return match ? match[1] : "";
       });
-    const baseIndent = leadingWs.length > 0
-      ? leadingWs.reduce((a, b) => (a.length <= b.length ? a : b))
-      : "";
+    const baseIndent =
+      leadingWs.length > 0
+        ? leadingWs.reduce((a, b) => (a.length <= b.length ? a : b))
+        : "";
 
     return fixedLines
       .map((line) => (line.trim().length > 0 ? baseIndent + line.trimStart() : ""))
@@ -379,10 +358,9 @@ export function activate(context: vscode.ExtensionContext) {
       let applied = 0;
       for (const region of [...regions].reverse()) {
         const stripped = stripCodeWrapper(region.content);
-        const fixed = await fixPromptText(stripped.promptText);
+        const fixed = fixPromptText(stripped.promptText, doc.uri.fsPath);
         if (fixed && fixed !== stripped.promptText) {
           const reindented = reindentFixed(stripped.promptText, fixed);
-          // Reconstruct: keep original wrapper lines, only replace prompt body
           const contentLines = region.content.split(/\r?\n/);
           const header = contentLines.slice(0, stripped.headerLineCount);
           const footer = contentLines.slice(
@@ -412,8 +390,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage("No auto-fixes available.");
       }
     } else {
-      // Pure prompt file: fix the whole file, preserve indentation
-      const fixed = await fixPromptText(fullText);
+      const fixed = fixPromptText(fullText, doc.uri.fsPath);
       if (fixed && fixed !== fullText) {
         const reindented = reindentFixed(fullText, fixed);
         const fullRange = new vscode.Range(
@@ -431,46 +408,6 @@ export function activate(context: vscode.ExtensionContext) {
       }
     }
   }
-}
-
-function checkCLI() {
-  const pythonPath = currentConfig.pythonPath;
-  execFile(pythonPath, ["-m", "promptlint", "--version"], (err) => {
-    if (err) {
-      vscode.window
-        .showInformationMessage(
-          "promptlint CLI not found. Install with: pip install promptlint-cli",
-          "Install"
-        )
-        .then((sel) => {
-          if (sel === "Install") {
-            const term = vscode.window.createTerminal("PromptLint");
-            term.show();
-            term.sendText(
-              `${currentConfig.pythonPath} -m pip install promptlint-cli`
-            );
-          }
-        });
-    }
-  });
-}
-
-function parseRuleIds(listOutput: string): string[] {
-  const ids: string[] = [];
-  for (const line of listOutput.split("\n")) {
-    const trimmed = line.trim();
-    if (
-      trimmed &&
-      !trimmed.startsWith("─") &&
-      !trimmed.startsWith("│") &&
-      !trimmed.toLowerCase().includes("id") &&
-      !trimmed.toLowerCase().includes("promptlint rules")
-    ) {
-      const match = trimmed.match(/^[\s│]*([a-z][\w-]+)/);
-      if (match) ids.push(match[1]);
-    }
-  }
-  return ids;
 }
 
 export function deactivate() {}
