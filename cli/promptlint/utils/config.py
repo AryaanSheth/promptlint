@@ -23,6 +23,10 @@ class PromptlintConfig:
             "cost-limit": True,
             "structure-sections": True,
             "prompt-injection": True,
+            "jailbreak-pattern": True,
+            "pii-in-prompt": True,
+            "secret-in-prompt": True,
+            "context-injection-boundary": True,
             "politeness-bloat": True,
             "clarity-vague-terms": True,
             "specificity-examples": True,
@@ -32,6 +36,9 @@ class PromptlintConfig:
             "actionability-weak-verbs": True,
             "consistency-terminology": True,
             "completeness-edge-cases": True,
+            "role-clarity": True,
+            "output-format-missing": True,
+            "hallucination-risk": True,
         }
     )
     politeness_words: List[str] = field(
@@ -52,6 +59,16 @@ class PromptlintConfig:
             "system prompt extraction",
             "you are now a [a-zA-Z ]+",
         ]
+    )
+    jailbreak_patterns: List[str] = field(default_factory=list)
+    pii_checks: Dict[str, bool] = field(
+        default_factory=lambda: {
+            "check_email": True,
+            "check_phone": True,
+            "check_ssn": True,
+            "check_credit_card": True,
+            "check_ip": False,
+        }
     )
     required_tags: List[str] = field(
         default_factory=lambda: ["task", "context", "output_format"]
@@ -87,6 +104,8 @@ class PromptlintConfig:
 
         politeness_cfg = _get_rule_cfg(rules_cfg, "politeness_bloat", "politeness-bloat")
         injection_cfg = _get_rule_cfg(rules_cfg, "prompt_injection", "prompt-injection")
+        jailbreak_cfg = _get_rule_cfg(rules_cfg, "jailbreak_pattern", "jailbreak-pattern")
+        pii_cfg = _get_rule_cfg(rules_cfg, "pii_in_prompt", "pii-in-prompt")
         structure_tags_cfg = _get_rule_cfg(rules_cfg, "structure_tags", "structure-tags")
         consistency_cfg = _get_rule_cfg(rules_cfg, "consistency_terminology", "consistency-terminology")
 
@@ -116,6 +135,15 @@ class PromptlintConfig:
         )
         validated_patterns = _validate_regex_patterns(raw_patterns)
 
+        jailbreak_extra = _coerce_list(jailbreak_cfg.get("patterns"), [])
+        jailbreak_validated = _validate_regex_patterns(jailbreak_extra)
+
+        default_pii = cls().pii_checks.copy()
+        for k in ("check_email", "check_phone", "check_ssn", "check_credit_card", "check_ip"):
+            v = pii_cfg.get(k)
+            if isinstance(v, bool):
+                default_pii[k] = v
+
         return cls(
             model=str(data.get("model", cls.model)),
             token_limit=_clamp_int(data.get("token_limit", cls.token_limit), 1, 1_000_000, cls.token_limit),
@@ -138,6 +166,8 @@ class PromptlintConfig:
                 data.get("allow_politeness", cls.allow_politeness))
             ),
             injection_patterns=validated_patterns,
+            jailbreak_patterns=jailbreak_validated,
+            pii_checks=default_pii,
             required_tags=_coerce_list(
                 structure_tags_cfg.get("required_tags"), cls().required_tags
             ),

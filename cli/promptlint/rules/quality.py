@@ -351,3 +351,116 @@ def check_completeness(text: str, config: PromptlintConfig) -> List[Dict[str, ob
         )
 
     return results
+
+
+# ── Role clarity ──────────────────────────────────────────────────────────
+
+def check_role_clarity(text: str, config: PromptlintConfig) -> List[Dict[str, object]]:
+    if not config.enabled_rules.get("role-clarity", True):
+        return []
+
+    if len(text.split()) < 30:
+        return []
+
+    is_instructional = bool(re.search(
+        r"\b(you|your|respond|answer|help|assist|always|never|must|should)\b",
+        text, re.IGNORECASE,
+    ))
+    if not is_instructional:
+        return []
+
+    has_role = bool(re.search(
+        r"\b(you are|you're|act as|your role is|you will serve as|"
+        r"you are a|you are an|you work as|your job is|your task is|"
+        r"you are responsible for|you specialize in)\b",
+        text, re.IGNORECASE,
+    ))
+
+    if not has_role:
+        return [
+            {
+                "level": "WARN",
+                "rule": "role-clarity",
+                "message": "No role or persona defined. Add 'You are a [role]...' to improve output consistency.",
+                "line": "-",
+                "context": _preview(text, config.preview_length),
+            }
+        ]
+    return []
+
+
+# ── Output format missing ─────────────────────────────────────────────────
+
+_OUTPUT_INSTRUCTION_VERBS = re.compile(
+    r"\b(list|extract|find|return|give me|provide|output|generate|create|show|summarize|identify|enumerate)\b",
+    re.IGNORECASE,
+)
+_OUTPUT_FORMAT_KEYWORDS = re.compile(
+    r"\b(JSON|XML|CSV|markdown|bullet|numbered|table|plain text|HTML|YAML|format:|return as|output as|structured as|schema)\b",
+    re.IGNORECASE,
+)
+
+
+def check_output_format(text: str, config: PromptlintConfig) -> List[Dict[str, object]]:
+    if not config.enabled_rules.get("output-format-missing", True):
+        return []
+
+    if len(text) < 60:
+        return []
+
+    if _OUTPUT_INSTRUCTION_VERBS.search(text) and not _OUTPUT_FORMAT_KEYWORDS.search(text):
+        return [
+            {
+                "level": "WARN",
+                "rule": "output-format-missing",
+                "message": (
+                    "Output instruction detected but no format specified "
+                    "(JSON, markdown, bullet list, etc.). Unspecified format produces inconsistent results."
+                ),
+                "line": "-",
+                "context": _preview(text, config.preview_length),
+            }
+        ]
+    return []
+
+
+# ── Hallucination risk ────────────────────────────────────────────────────
+
+_FACTUAL_QUESTION_PATTERNS = [
+    re.compile(r"\b(what is|what are|who is|who are|when did|when was|where is|how many|how much)\b", re.IGNORECASE),
+    re.compile(r"\b(current(ly)?|latest|recent(ly)?|today|now|as of|up to date)\b", re.IGNORECASE),
+    re.compile(r"\b(tell me about|give me (?:the|a) (?:list|summary|overview) of)\b", re.IGNORECASE),
+]
+
+_GROUNDING_INDICATORS = [
+    re.compile(r"\{[\w\s]+\}"),
+    re.compile(r"<context>", re.IGNORECASE),
+    re.compile(r"Context:", re.IGNORECASE),
+    re.compile(r"```"),
+    re.compile(r"Given the following", re.IGNORECASE),
+    re.compile(r"Based on the (?:following|above|provided)", re.IGNORECASE),
+    re.compile(r"Using the (?:data|information|context|text) (?:below|above|provided)", re.IGNORECASE),
+]
+
+
+def check_hallucination_risk(text: str, config: PromptlintConfig) -> List[Dict[str, object]]:
+    if not config.enabled_rules.get("hallucination-risk", True):
+        return []
+
+    has_factual = any(p.search(text) for p in _FACTUAL_QUESTION_PATTERNS)
+    has_grounding = any(p.search(text) for p in _GROUNDING_INDICATORS)
+
+    if has_factual and not has_grounding:
+        return [
+            {
+                "level": "WARN",
+                "rule": "hallucination-risk",
+                "message": (
+                    "Prompt requests factual/current information without grounding context. "
+                    "Consider adding a {context} variable or <context> section with source data."
+                ),
+                "line": "-",
+                "context": _preview(text, config.preview_length),
+            }
+        ]
+    return []

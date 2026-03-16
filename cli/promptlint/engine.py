@@ -9,8 +9,17 @@ from .rules.quality import (
     check_actionability,
     check_consistency,
     check_completeness,
+    check_role_clarity,
+    check_output_format,
+    check_hallucination_risk,
 )
-from .rules.security import check_injection
+from .rules.security import (
+    check_injection,
+    check_jailbreak,
+    check_pii,
+    check_secrets,
+    check_injection_boundary,
+)
 
 
 class LintEngine:
@@ -27,7 +36,11 @@ class LintEngine:
         
         # Security checks
         results.extend(check_injection(text, self.config))
-        
+        results.extend(check_jailbreak(text, self.config))
+        results.extend(check_pii(text, self.config))
+        results.extend(check_secrets(text, self.config))
+        results.extend(check_injection_boundary(text, self.config))
+
         # Advanced quality checks
         results.extend(check_clarity(text, self.config))
         results.extend(check_specificity(text, self.config))
@@ -35,6 +48,9 @@ class LintEngine:
         results.extend(check_actionability(text, self.config))
         results.extend(check_consistency(text, self.config))
         results.extend(check_completeness(text, self.config))
+        results.extend(check_role_clarity(text, self.config))
+        results.extend(check_output_format(text, self.config))
+        results.extend(check_hallucination_risk(text, self.config))
 
         if not self.config.enabled_rules.get("politeness-bloat", True):
             return results

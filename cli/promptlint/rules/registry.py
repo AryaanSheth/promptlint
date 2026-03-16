@@ -202,6 +202,103 @@ _RULES: List[RuleMeta] = [
             "inputs, this rule nudges you to add that guidance."
         ),
     ),
+    RuleMeta(
+        id="jailbreak-pattern",
+        category="Security",
+        default_severity="CRITICAL",
+        fixable=True,
+        short="Detect social-engineering and roleplay jailbreak patterns.",
+        long=(
+            "Scans for patterns that use roleplay, hypotheticals, or fictional\n"
+            "framing to bypass AI guardrails: 'pretend you are', 'DAN', 'no\n"
+            "restrictions', 'developer mode', etc. Applies the same leet-speak\n"
+            "and unicode normalization as prompt-injection.\n\n"
+            "With --fix the offending lines are removed."
+        ),
+    ),
+    RuleMeta(
+        id="role-clarity",
+        category="Quality: Structure",
+        default_severity="WARN",
+        fixable=False,
+        short="Flag instructional prompts missing a role/persona definition.",
+        long=(
+            "Detects system prompts that contain instructional language but\n"
+            "never define the model's role. Prompts without 'You are a [role]'\n"
+            "produce inconsistent, generic output. Only fires on prompts with\n"
+            "30+ words that contain instructional verbs."
+        ),
+    ),
+    RuleMeta(
+        id="output-format-missing",
+        category="Quality: Completeness",
+        default_severity="WARN",
+        fixable=False,
+        short="Detect output instructions without a format specification.",
+        long=(
+            "Fires when the prompt contains output-instruction verbs (list,\n"
+            "extract, return, generate, etc.) but no format specification\n"
+            "(JSON, CSV, markdown, bullet list, etc.).\n\n"
+            "Unspecified format is the #1 cause of inconsistent LLM outputs\n"
+            "in production — the model invents its own format every call."
+        ),
+    ),
+    RuleMeta(
+        id="pii-in-prompt",
+        category="Security",
+        default_severity="WARN",
+        fixable=False,
+        short="Detect PII (emails, SSNs, phone numbers, credit cards) in prompts.",
+        long=(
+            "Scans for personally identifiable information hardcoded into\n"
+            "prompt files: email addresses, SSNs, phone numbers, credit card\n"
+            "numbers, and IP addresses. Skips template variables like {email}.\n\n"
+            "Configurable per PII type under rules.pii_in_prompt in .promptlintrc.\n"
+            "GDPR/HIPAA blocker for enterprise adoption."
+        ),
+    ),
+    RuleMeta(
+        id="secret-in-prompt",
+        category="Security",
+        default_severity="CRITICAL",
+        fixable=False,
+        short="Detect API keys, tokens, and credentials hardcoded in prompts.",
+        long=(
+            "Scans for API keys (OpenAI sk-, Anthropic sk-ant-, GitHub ghp_),\n"
+            "Bearer tokens, generic api_key assignments, hardcoded passwords,\n"
+            "and hex hashes that may be tokens. Skips template variables.\n\n"
+            "Risk: system compromise. Remove before committing."
+        ),
+    ),
+    RuleMeta(
+        id="hallucination-risk",
+        category="Quality: Reliability",
+        default_severity="WARN",
+        fixable=False,
+        short="Flag prompts requesting current facts without grounding context.",
+        long=(
+            "Detects prompts that ask for current/recent information ('what is\n"
+            "the latest', 'as of today') without providing a grounding context\n"
+            "variable ({context}), <context> tag, or 'Based on the following'\n"
+            "preamble. These prompts will hallucinate consistently.\n\n"
+            "Fix: add a {context} variable and populate it with source data."
+        ),
+    ),
+    RuleMeta(
+        id="context-injection-boundary",
+        category="Security",
+        default_severity="WARN",
+        fixable=False,
+        short="Detect template variables not enclosed by structural delimiters.",
+        long=(
+            "Finds template variables ({user_input}, {{query}}) placed inside\n"
+            "instructional text without a structural delimiter (XML tag, code\n"
+            "fence, or labeled header like 'User Input:'). This is the\n"
+            "architectural root cause of prompt injection: without a boundary,\n"
+            "appending instructions to user content works trivially.\n\n"
+            "Fix: wrap with <user_input>{user_input}</user_input> or a fence."
+        ),
+    ),
 ]
 
 RULE_MAP: Dict[str, RuleMeta] = {r.id: r for r in _RULES}

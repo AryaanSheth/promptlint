@@ -71,6 +71,25 @@ rules:
     enabled: true
   completeness_edge_cases:
     enabled: true
+  jailbreak_pattern:
+    enabled: true
+  role_clarity:
+    enabled: true
+  output_format_missing:
+    enabled: true
+  pii_in_prompt:
+    enabled: true
+    check_email: true
+    check_phone: true
+    check_ssn: true
+    check_credit_card: true
+    check_ip: false
+  secret_in_prompt:
+    enabled: true
+  hallucination_risk:
+    enabled: true
+  context_injection_boundary:
+    enabled: true
 
 fix:
   enabled: true
