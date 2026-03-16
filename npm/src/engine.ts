@@ -1,7 +1,13 @@
 import type { PromptlintConfig } from "./config";
 import { checkTokens, countTokens } from "./rules/cost";
 import type { Finding } from "./rules/cost";
-import { checkInjection } from "./rules/security";
+import {
+  checkInjection,
+  checkJailbreak,
+  checkPii,
+  checkSecrets,
+  checkInjectionBoundary,
+} from "./rules/security";
 import {
   checkStructure,
   checkClarity,
@@ -10,6 +16,9 @@ import {
   checkActionability,
   checkConsistency,
   checkCompleteness,
+  checkRoleClarity,
+  checkOutputFormat,
+  checkHallucinationRisk,
 } from "./rules/quality";
 import { lineNumber, lineContext } from "./rules/utils";
 
@@ -21,13 +30,28 @@ export function analyze(text: string, config: PromptlintConfig): Finding[] {
   results.push(...checkTokens(text, config));
   results.push(...checkStructure(text, config));
   results.push(...checkInjection(text, config));
+  results.push(...checkJailbreak(text, config));
+  results.push(...checkPii(text, config));
+  results.push(...checkSecrets(text, config));
+  results.push(...checkInjectionBoundary(text, config));
   results.push(...checkClarity(text, config));
   results.push(...checkSpecificity(text, config));
   results.push(...checkVerbosity(text, config));
   results.push(...checkActionability(text, config));
   results.push(...checkConsistency(text, config));
   results.push(...checkCompleteness(text, config));
+  results.push(...checkRoleClarity(text, config));
+  results.push(...checkOutputFormat(text, config));
+  results.push(...checkHallucinationRisk(text, config));
   results.push(...checkPoliteness(text, config));
+
+  // Apply rule severity overrides
+  if (config.ruleSeverityOverrides && Object.keys(config.ruleSeverityOverrides).length > 0) {
+    for (const r of results) {
+      const override = config.ruleSeverityOverrides[r.rule];
+      if (override) r.level = override as Finding["level"];
+    }
+  }
 
   return results;
 }
@@ -176,6 +200,71 @@ function normalizeSpacing(text: string): string {
 
 function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// ── Prompt health score ──────────────────────────────────────────────────
+
+const SECURITY_RULES = new Set([
+  "prompt-injection", "jailbreak-pattern", "pii-in-prompt",
+  "secret-in-prompt", "context-injection-boundary",
+]);
+const COST_RULES = new Set(["cost", "cost-limit", "politeness-bloat"]);
+const COMPLETENESS_RULES = new Set([
+  "completeness-edge-cases", "role-clarity", "output-format-missing",
+  "hallucination-risk", "specificity-examples", "specificity-constraints",
+]);
+const QUALITY_RULES = new Set([
+  "clarity-vague-terms", "verbosity-sentence-length", "verbosity-redundancy",
+  "actionability-weak-verbs", "consistency-terminology", "structure-sections",
+]);
+
+function catScore(
+  findings: Finding[],
+  criticalW = 25, warnW = 10, infoW = 3,
+  criticalCap = 100, warnCap = 30, infoCap = 15,
+): number {
+  const crit = findings.filter((f) => f.level === "CRITICAL").length;
+  const warn = findings.filter((f) => f.level === "WARN").length;
+  const info = findings.filter((f) => f.level === "INFO").length;
+  const deduction =
+    Math.min(crit * criticalW, criticalCap) +
+    Math.min(warn * warnW, warnCap) +
+    Math.min(info * infoW, infoCap);
+  return Math.max(0, 100 - deduction);
+}
+
+export interface ScoreResult {
+  overall: number;
+  grade: string;
+  categories: { security: number; cost: number; quality: number; completeness: number };
+}
+
+export function computeScore(results: Finding[]): ScoreResult {
+  const sec = results.filter((r) => SECURITY_RULES.has(r.rule));
+  const cost = results.filter((r) => COST_RULES.has(r.rule));
+  const comp = results.filter((r) => COMPLETENESS_RULES.has(r.rule));
+  const qual = results.filter((r) => QUALITY_RULES.has(r.rule));
+
+  const secScore = catScore(sec, 25, 10, 3, 50, 30, 15);
+  const costScore = catScore(cost, 25, 10, 3, 100, 30, 15);
+  const qualScore = catScore(qual, 25, 8, 3, 100, 30, 15);
+  const compScore = catScore(comp, 25, 10, 3, 100, 30, 15);
+
+  const overall = Math.round(
+    secScore * 0.40 + costScore * 0.20 + qualScore * 0.25 + compScore * 0.15,
+  );
+
+  const grade =
+    overall >= 90 ? "A" :
+    overall >= 75 ? "B" :
+    overall >= 60 ? "C" :
+    overall >= 45 ? "D" : "F";
+
+  return {
+    overall,
+    grade,
+    categories: { security: secScore, cost: costScore, quality: qualScore, completeness: compScore },
+  };
 }
 
 // ── Public API (programmatic use) ────────────────────────────────────────
