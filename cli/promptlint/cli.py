@@ -13,7 +13,7 @@ from rich.console import Console
 from rich.table import Table
 
 from . import __version__
-from .engine import LintEngine
+from .engine import LintEngine, compute_score
 from .rules.registry import ALL_RULES, RULE_MAP
 from .utils.config import PromptlintConfig, load_config
 
@@ -425,6 +425,68 @@ def _fix_redundancy(text: str) -> str:
     return _normalize_spacing_and_punctuation(updated)
 
 
+# ── Score rendering ──────────────────────────────────────────────────────
+
+
+def _render_score(score: dict) -> None:
+    overall = score["overall"]
+    grade = score["grade"]
+    cats = score["categories"]
+    console.print(f"\nPromptLint Score: [bold]{overall}/100[/bold]  (Grade: {grade})")
+    for cat, val in cats.items():
+        icon = "✓" if val >= 80 else "⚠"
+        console.print(f"  {cat.capitalize():<14} {val:>3}/100  {icon}")
+
+
+# ── SARIF output ────────────────────────────────────────────────────────
+
+
+def _build_sarif(all_results: list[dict], file_map: dict[str, list[dict]]) -> dict:
+    _sev_map = {"CRITICAL": "error", "WARN": "warning", "INFO": "note"}
+    sarif_results = []
+    for uri, findings in file_map.items():
+        for f in findings:
+            line = f.get("line", "-")
+            location: dict = {"artifactLocation": {"uri": uri}}
+            if isinstance(line, int):
+                location["region"] = {"startLine": line}
+            sarif_results.append(
+                {
+                    "ruleId": f.get("rule", "unknown"),
+                    "level": _sev_map.get(f.get("level", "INFO"), "note"),
+                    "message": {"text": f.get("message", "")},
+                    "locations": [{"physicalLocation": location}],
+                }
+            )
+
+    from .rules.registry import ALL_RULES
+    sarif_rules = [
+        {
+            "id": r.id,
+            "shortDescription": {"text": r.short},
+            "defaultConfiguration": {"level": _sev_map.get(r.default_severity, "note")},
+        }
+        for r in ALL_RULES
+    ]
+
+    return {
+        "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [
+            {
+                "tool": {
+                    "driver": {
+                        "name": "PromptLint",
+                        "version": __version__,
+                        "rules": sarif_rules,
+                    }
+                },
+                "results": sarif_results,
+            }
+        ],
+    }
+
+
 # ── Severity / exit-code helpers ────────────────────────────────────────
 
 
@@ -444,6 +506,7 @@ def _run_lint_on_text(
     *,
     fix: bool,
     show_dashboard: bool,
+    show_score: bool = False,
     output_format: str,
     quiet: bool,
     label: Optional[str] = None,
@@ -506,6 +569,8 @@ def _run_lint_on_text(
             payload["file"] = label
         if show_dashboard:
             payload["dashboard"] = dashboard
+        if show_score:
+            payload["score"] = compute_score(results)
         print(json.dumps(payload, indent=2))
     else:
         if label and not quiet:
@@ -519,6 +584,8 @@ def _run_lint_on_text(
                 config_data.cost_per_1k_tokens,
                 config_data.calls_per_day,
             )
+        if show_score and not quiet:
+            _render_score(compute_score(results))
         if optimized_prompt is not None and not quiet:
             console.print("Optimized Prompt")
             console.print(optimized_prompt)
@@ -537,12 +604,15 @@ def _run_lint(
     fix: bool,
     fail_level: str,
     show_dashboard: bool,
+    show_score: bool,
     quiet: bool,
 ) -> None:
     config_data = load_config(config)
     t0 = time.time()
 
     all_results: list[dict] = []
+    sarif_file_map: dict[str, list[dict]] = {}
+    inner_format = output_format if output_format != "sarif" else "text"
 
     if files:
         for fp in files:
@@ -558,11 +628,14 @@ def _run_lint(
                 config_data,
                 fix=fix,
                 show_dashboard=show_dashboard,
-                output_format=output_format,
-                quiet=quiet,
+                show_score=show_score,
+                output_format=inner_format,
+                quiet=quiet or output_format == "sarif",
                 label=str(fp) if len(files) > 1 else None,
             )
             all_results.extend(results)
+            if output_format == "sarif":
+                sarif_file_map[str(fp)] = results
     else:
         prompt_text = _read_input(text, None)
         results = _run_lint_on_text(
@@ -570,12 +643,25 @@ def _run_lint(
             config_data,
             fix=fix,
             show_dashboard=show_dashboard,
-            output_format=output_format,
-            quiet=quiet,
+            show_score=show_score,
+            output_format=inner_format,
+            quiet=quiet or output_format == "sarif",
         )
         all_results.extend(results)
+        if output_format == "sarif":
+            sarif_file_map["<stdin>"] = results
 
     elapsed = time.time() - t0
+
+    if output_format == "sarif":
+        print(json.dumps(_build_sarif(all_results, sarif_file_map), indent=2))
+        severity = _max_severity(all_results)
+        fl = fail_level.lower()
+        if fl == "warn" and severity >= 1:
+            sys.exit(1)
+        if fl == "critical" and severity >= 2:
+            sys.exit(2)
+        return
 
     n_files = len(files) if files else 1
     n_issues = len(all_results)
@@ -667,7 +753,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--format",
         default="text",
-        choices=["text", "json"],
+        choices=["text", "json", "sarif"],
         help="Output format (default: text).",
     )
     parser.add_argument(
@@ -685,6 +771,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--show-dashboard",
         action="store_true",
         help="Include the savings dashboard in output.",
+    )
+    parser.add_argument(
+        "--show-score",
+        action="store_true",
+        help="Show prompt health score (0-100) and grade.",
     )
     parser.add_argument(
         "--quiet",
@@ -758,6 +849,7 @@ def main() -> None:
             fix=args.fix,
             fail_level=args.fail_level,
             show_dashboard=args.show_dashboard,
+            show_score=args.show_score,
             quiet=args.quiet,
         )
     except (ValueError, UnicodeDecodeError, OSError) as exc:

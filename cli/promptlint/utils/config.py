@@ -74,6 +74,7 @@ class PromptlintConfig:
         default_factory=lambda: ["task", "context", "output_format"]
     )
     custom_term_pairs: List[List[str]] = field(default_factory=list)
+    rule_severity_overrides: Dict[str, str] = field(default_factory=dict)
     fix_enabled: bool = True
     fix_rules: Dict[str, bool] = field(
         default_factory=lambda: {
@@ -91,6 +92,8 @@ class PromptlintConfig:
         fix_cfg = _get_mapping(data, "fix")
 
         enabled_rules = cls().enabled_rules.copy()
+        severity_overrides: Dict[str, str] = {}
+        _valid_severities = {"info", "warn", "critical"}
         for key, value in rules_cfg.items():
             normalized = _normalize_rule_key(key)
             if normalized in ("structure-tags", "structure-delimiters"):
@@ -99,6 +102,15 @@ class PromptlintConfig:
                 enabled = value.get("enabled")
                 if isinstance(enabled, bool):
                     enabled_rules[normalized] = enabled
+                sev = value.get("severity")
+                if isinstance(sev, str) and sev.lower() in _valid_severities:
+                    severity_overrides[normalized] = sev.upper()
+                elif sev is not None:
+                    print(
+                        f"[promptlint] WARNING: Invalid severity '{sev}' for rule '{normalized}'. "
+                        "Use info, warn, or critical.",
+                        file=sys.stderr,
+                    )
             elif isinstance(value, bool):
                 enabled_rules[normalized] = value
 
@@ -172,6 +184,7 @@ class PromptlintConfig:
                 structure_tags_cfg.get("required_tags"), cls().required_tags
             ),
             custom_term_pairs=_coerce_term_pairs(consistency_cfg.get("custom_pairs")),
+            rule_severity_overrides=severity_overrides,
             fix_enabled=fix_enabled,
             fix_rules=fix_rules,
         )

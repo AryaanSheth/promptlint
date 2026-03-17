@@ -12,7 +12,18 @@
       "Bash(node \"c:\\\\Users\\\\aryaa\\\\OneDrive\\\\Desktop\\\\Coding\\\\promptlint\\\\npm\\\\dist\\\\cli.js\" --text \"Please kindly write me some code.\" --fix)",
       "Bash(npm pack:*)",
       "Bash(npm pkg:*)",
-      "Bash(npm info:*)"
+      "Bash(npm info:*)",
+      "Bash(grep -r \"pricing\\\\|monetiz\\\\|payment\\\\|subscribe\" /c/Users/aryaa/OneDrive/Desktop/Coding/promptlint --include=*.md --include=*.ts --include=*.py -i)",
+      "WebSearch",
+      "Bash(ls -lah \"/c/Users/aryaa/OneDrive/Desktop/Coding/promptlint/vscode/\"*.vsix)",
+      "Bash(python3 -c \"import sys; sys.path.insert\\(0, ''/c/Users/aryaa/OneDrive/Desktop/Coding/promptlint/cli''\\); from promptlint.cli import _strengthen_verbs; print\\(''Found _strengthen_verbs''\\)\")",
+      "Bash(grep -h \"^import\\\\|^export\" /c/Users/aryaa/OneDrive/Desktop/Coding/promptlint/vscode/src/*.ts)",
+      "Bash(grep -n \"^\\\\s*//.*[a-zA-Z]\" /c/Users/aryaa/OneDrive/Desktop/Coding/promptlint/cli/promptlint/cli.py)",
+      "Bash(grep -h \"^export\" /c/Users/aryaa/OneDrive/Desktop/Coding/promptlint/npm/src/rules/*.ts)",
+      "Bash(grep -r \"structure_style\\\\|structure-style\" /c/Users/aryaa/OneDrive/Desktop/Coding/promptlint --include=*.ts --include=*.py --include=*.js)",
+      "Bash(grep -n \"self.config.structure_style\\\\|\\\\.structure_style\" /c/Users/aryaa/OneDrive/Desktop/Coding/promptlint/cli/promptlint/*.py)",
+      "Bash(python -m pytest tests/ -v)",
+      "Bash(python -m pytest tests/ -q)"
     ]
   }
 }
