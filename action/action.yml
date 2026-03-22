@@ -1,0 +1,55 @@
+name: 'PromptLint'
+description: 'Lint LLM prompts for injection attacks, leaked secrets, PII, token waste, and quality issues'
+author: 'AryaanSheth'
+
+branding:
+  icon: 'shield'
+  color: 'green'
+
+inputs:
+  path:
+    description: 'Files or glob pattern to lint (e.g. prompts/**/*.txt)'
+    required: false
+    default: '.'
+
+  fail-level:
+    description: 'Minimum severity that causes a non-zero exit: none | warn | critical'
+    required: false
+    default: 'critical'
+
+  config:
+    description: 'Path to a .promptlintrc config file. Defaults to repo root .promptlintrc if present.'
+    required: false
+    default: ''
+
+  show-score:
+    description: 'Print the A–F health score summary in the workflow log'
+    required: false
+    default: 'false'
+
+  sarif-output:
+    description: 'Path to write a SARIF v2.1.0 file for upload to the GitHub Security tab. Leave blank to skip.'
+    required: false
+    default: ''
+
+  annotations:
+    description: 'Emit GitHub workflow annotations (inline on the PR diff) for each finding'
+    required: false
+    default: 'true'
+
+outputs:
+  findings-count:
+    description: 'Total number of findings across all scanned files'
+
+  critical-count:
+    description: 'Number of CRITICAL severity findings'
+
+  score:
+    description: 'Overall prompt health score (0–100)'
+
+  grade:
+    description: 'Prompt health grade (A / B / C / D / F)'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'

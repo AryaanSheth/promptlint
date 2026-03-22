@@ -9,6 +9,8 @@ __pycache__/
 .eggs/
 dist/
 build/
+# Action dist must be committed (GitHub executes it directly)
+!action/dist/
 __pypackages__/
 .venv/
 venv/
