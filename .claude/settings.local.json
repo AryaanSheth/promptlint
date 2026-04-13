@@ -23,7 +23,15 @@
       "Bash(grep -r \"structure_style\\\\|structure-style\" /c/Users/aryaa/OneDrive/Desktop/Coding/promptlint --include=*.ts --include=*.py --include=*.js)",
       "Bash(grep -n \"self.config.structure_style\\\\|\\\\.structure_style\" /c/Users/aryaa/OneDrive/Desktop/Coding/promptlint/cli/promptlint/*.py)",
       "Bash(python -m pytest tests/ -v)",
-      "Bash(python -m pytest tests/ -q)"
+      "Bash(python -m pytest tests/ -q)",
+      "Bash(npx ncc:*)",
+      "Bash(pip index:*)",
+      "Bash(npm view:*)",
+      "Bash(rm -rf dist/)",
+      "Bash(python -m build)",
+      "Bash(python -m twine upload dist/*)",
+      "Bash(npm publish:*)",
+      "Bash(npm whoami:*)"
     ]
   }
 }

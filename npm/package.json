@@ -1,6 +1,6 @@
 {
   "name": "promptlint-cli",
-  "version": "1.0.0",
+  "version": "1.3.0",
   "description": "Static analysis for LLM prompts — catch cost waste, quality issues, and injection risks",
   "keywords": [
     "llm",
