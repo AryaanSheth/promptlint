@@ -5,7 +5,7 @@ Lint LLM prompts in CI. Catches injection attacks, leaked API keys, PII, token w
 ## Quick start
 
 ```yaml
-- uses: AryaanSheth/promptlint/action@v1
+- uses: AryaanSheth/promptlint@v1
   with:
     path: 'prompts/**/*.txt'
 ```
@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: AryaanSheth/promptlint/action@v1
+      - uses: AryaanSheth/promptlint@v1
         with:
           path: 'prompts/'
 ```
@@ -53,7 +53,7 @@ jobs:
 ### Strict mode — block on any WARN or CRITICAL
 
 ```yaml
-- uses: AryaanSheth/promptlint/action@v1
+- uses: AryaanSheth/promptlint@v1
   with:
     path: 'prompts/'
     fail-level: warn
@@ -70,7 +70,7 @@ permissions:
 steps:
   - uses: actions/checkout@v4
 
-  - uses: AryaanSheth/promptlint/action@v1
+  - uses: AryaanSheth/promptlint@v1
     with:
       path: 'prompts/'
       sarif-output: promptlint.sarif

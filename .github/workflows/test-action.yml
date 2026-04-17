@@ -47,7 +47,7 @@ jobs:
 
       - name: Run action against bad prompt
         id: lint-bad
-        uses: ./action
+        uses: ./
         with:
           path: 'test-prompts/bad.txt'
           fail-level: none
@@ -70,7 +70,7 @@ jobs:
 
       - name: Run action against good prompt
         id: lint-good
-        uses: ./action
+        uses: ./
         with:
           path: 'test-prompts/good.txt'
           fail-level: critical
@@ -89,7 +89,7 @@ jobs:
       # ── Test 3: SARIF output is written ──────────────────────────────────
 
       - name: Run action with SARIF output
-        uses: ./action
+        uses: ./
         with:
           path: 'test-prompts/bad.txt'
           fail-level: none
@@ -121,7 +121,7 @@ jobs:
 
       - name: Run action against glob pattern
         id: lint-glob
-        uses: ./action
+        uses: ./
         with:
           path: 'test-prompts/**/*.txt'
           fail-level: none
@@ -141,7 +141,7 @@ jobs:
 
       - name: Run action with fail-level warn (expect failure captured)
         id: lint-warn
-        uses: ./action
+        uses: ./
         with:
           path: 'test-prompts/good.txt'
           fail-level: warn
