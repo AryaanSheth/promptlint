@@ -1,4 +1,4 @@
-name: 'PromptLint'
+name: 'PromptLint Action'
 description: 'Lint LLM prompts for injection attacks, leaked secrets, PII, token waste, and quality issues'
 author: 'AryaanSheth'
 
