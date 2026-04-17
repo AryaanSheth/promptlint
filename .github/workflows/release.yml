@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release-action:
+    name: Release GitHub Action
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Extract major version
+        id: version
+        run: |
+          MAJOR=$(echo "${{ github.ref_name }}" | grep -oP '^v\d+')
+          echo "major=$MAJOR" >> "$GITHUB_OUTPUT"
+
+      # Rebuild dist from source to guarantee it matches this exact tag
+      - name: Build npm engine
+        working-directory: npm
+        run: npm install && npm run build
+
+      - name: Build action dist
+        working-directory: action
+        run: npm install && npm run build
+
+      - name: Commit dist if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add action/dist/
+          if git diff --staged --quiet; then
+            echo "dist is already current — no commit needed."
+          else
+            git commit -m "chore: rebuild action dist for ${{ github.ref_name }} [skip ci]"
+            git push origin HEAD:main
+          fi
+
+      - name: Update floating major-version tag
+        run: |
+          git tag -f "${{ steps.version.outputs.major }}"
+          git push origin "${{ steps.version.outputs.major }}" --force
+          echo "Moved ${{ steps.version.outputs.major }} → ${{ github.ref_name }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          append_body: true
+          body: |
+
+            ---
+            ## Using this action
+
+            Pin to exact version:
+            ```yaml
+            - uses: AryaanSheth/promptlint/action@${{ github.ref_name }}
+            ```
+
+            Or use the floating major tag (receives non-breaking updates automatically):
+            ```yaml
+            - uses: AryaanSheth/promptlint/action@${{ steps.version.outputs.major }}
+            ```
+
+            See [action/README.md](https://github.com/AryaanSheth/promptlint/blob/main/action/README.md) for full documentation.

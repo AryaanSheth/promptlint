@@ -70,6 +70,43 @@ jobs:
         working-directory: vscode
         run: npm run compile
 
+  action:
+    name: Action
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # npm engine must be built first — action depends on file:../npm
+      - name: Build npm engine
+        working-directory: npm
+        run: npm install && npm run build
+
+      - name: Install action dependencies
+        working-directory: action
+        run: npm install
+
+      - name: Typecheck action
+        working-directory: action
+        run: npm run typecheck
+
+      - name: Build action dist
+        working-directory: action
+        run: npm run build
+
+      - name: Verify dist is committed
+        run: |
+          if ! git diff --quiet action/dist/; then
+            echo "ERROR: action/dist/ is stale. Run 'cd action && npm run build' locally and commit the result."
+            git diff --stat action/dist/
+            exit 1
+          fi
+          echo "action/dist/ is up-to-date."
+
   publish-pypi:
     name: Publish to PyPI
     runs-on: ubuntu-latest

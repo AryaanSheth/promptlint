@@ -3,8 +3,16 @@ name: Test Action
 on:
   push:
     branches: [main]
+    paths:
+      - 'action/**'
+      - 'npm/**'
+      - '.github/workflows/test-action.yml'
   pull_request:
     branches: [main]
+    paths:
+      - 'action/**'
+      - 'npm/**'
+      - '.github/workflows/test-action.yml'
 
 jobs:
   test:
@@ -18,11 +26,14 @@ jobs:
         with:
           node-version: '20'
 
+      # Build npm engine first — action depends on file:../npm
+      - name: Build npm engine
+        working-directory: npm
+        run: npm install && npm run build
+
       - name: Build action
         working-directory: action
-        run: |
-          npm install
-          npm run build
+        run: npm install && npm run build
 
       # ── Test 1: known-bad prompt (injection) triggers CRITICAL ────────────
 
@@ -90,7 +101,6 @@ jobs:
             echo "FAIL: promptlint.sarif not found"
             exit 1
           fi
-          # Verify it's valid JSON with expected SARIF structure
           VERSION=$(jq -r '.version' promptlint.sarif)
           if [ "$VERSION" != "2.1.0" ]; then
             echo "FAIL: SARIF version mismatch: $VERSION"
@@ -137,7 +147,7 @@ jobs:
           fail-level: warn
         continue-on-error: true
 
-      - name: Verify warn level respected (either pass or warn-fail is acceptable)
+      - name: Verify warn level respected
         run: |
           echo "fail-level=warn test completed (result=${{ steps.lint-warn.outcome }})"
           echo "PASS: fail-level handling verified"
