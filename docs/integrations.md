@@ -4,156 +4,179 @@ Guide to integrating PromptLint with CI/CD, pre-commit hooks, and development wo
 
 ## Table of Contents
 
-- [GitHub Actions](#github-actions)
+- [GitHub Actions (first-party)](#github-actions)
 - [GitLab CI](#gitlab-ci)
 - [Pre-commit Hooks](#pre-commit-hooks)
-- [VS Code Integration](#vs-code-integration)
+- [VS Code](#vs-code)
 - [Docker](#docker)
-- [Make/Taskfile](#maketaskfile)
-- [Custom Integrations](#custom-integrations)
+- [Make / Taskfile](#maketaskfile)
+- [Custom Scripts](#custom-scripts)
 
 ---
 
 ## GitHub Actions
 
-### Basic Workflow
+PromptLint is published on the [GitHub Marketplace](https://github.com/marketplace/actions/promptlint-action) as a first-party action. No Python or Node.js setup required.
 
-`.github/workflows/promptlint.yml`:
-
-```yaml
-name: PromptLint
-
-on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main]
-
-jobs:
-  lint-prompts:
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-      
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e ./cli
-      
-      - name: Run PromptLint
-        run: |
-          python -m promptlint.cli \
-            --file prompts/system_prompt.txt \
-            --fail-level warn \
-            --format json \
-            --show-dashboard
-```
-
-### Advanced: Lint All Prompts
+### Minimal — scan files, block merges on CRITICAL findings
 
 ```yaml
-name: PromptLint - All Files
-
-on: [push, pull_request]
-
-jobs:
-  lint-prompts:
-    runs-on: ubuntu-latest
-    
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-      
-      - name: Install PromptLint
-        run: |
-          pip install -r requirements.txt
-      
-      - name: Find and lint all prompts
-        run: |
-          EXIT_CODE=0
-          for file in $(find prompts/ -name "*.txt"); do
-            echo "Linting $file..."
-            python -m promptlint.cli --file "$file" --fail-level warn --format json || EXIT_CODE=$?
-          done
-          exit $EXIT_CODE
-      
-      - name: Upload results
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: promptlint-results
-          path: '**/*.json'
-```
-
-### With Cost Reporting
-
-```yaml
-name: PromptLint - Cost Report
-
+# .github/workflows/promptlint.yml
+name: Lint Prompts
 on: [pull_request]
 
 jobs:
-  cost-analysis:
+  promptlint:
     runs-on: ubuntu-latest
-    
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - uses: AryaanSheth/promptlint@v1
         with:
-          python-version: '3.9'
-      
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-      
-      - name: Run cost analysis
-        id: analysis
-        run: |
-          RESULT=$(python -m promptlint.cli \
-            --file prompts/system_prompt.txt \
-            --format json \
-            --show-dashboard)
-          
-          TOKENS=$(echo $RESULT | jq '.dashboard.current_tokens')
-          SAVINGS=$(echo $RESULT | jq '.dashboard.savings_per_call')
-          
-          echo "tokens=$TOKENS" >> $GITHUB_OUTPUT
-          echo "savings=$SAVINGS" >> $GITHUB_OUTPUT
-      
-      - name: Comment on PR
-        uses: actions/github-script@v6
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `## PromptLint Report
-              
-              **Current Tokens:** ${{ steps.analysis.outputs.tokens }}
-              **Potential Savings:** $$${{ steps.analysis.outputs.savings }} per call
-              
-              Run \`--fix\` to optimize your prompts!`
-            })
+          path: 'prompts/**/*.txt'
 ```
+
+Fails the job when any CRITICAL finding is detected (injection, leaked secrets, PII). Inline annotations appear on the PR diff automatically.
+
+### Inline prompt string — lint text directly
+
+Use the `prompt` input to lint a string instead of files. No `actions/checkout` step required when linting strings stored in secrets or env vars.
+
+```yaml
+name: Lint System Prompt
+on: [push]
+
+jobs:
+  promptlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: AryaanSheth/promptlint@v1
+        with:
+          prompt: 'You are a helpful assistant. Always be concise.'
+          fail-level: critical
+          show-score: true
+```
+
+Lint a prompt stored in a GitHub secret:
+
+```yaml
+- uses: AryaanSheth/promptlint@v1
+  with:
+    prompt: ${{ secrets.SYSTEM_PROMPT }}
+    fail-level: warn
+```
+
+> **Note:** When `prompt` is set, the `path` input is ignored.
+
+### Strict mode — fail on WARN or CRITICAL
+
+```yaml
+- uses: AryaanSheth/promptlint@v1
+  with:
+    path: 'prompts/'
+    fail-level: warn
+    show-score: true
+```
+
+### With SARIF upload — findings in the Security tab
+
+```yaml
+permissions:
+  contents: read
+  security-events: write
+
+steps:
+  - uses: actions/checkout@v4
+
+  - uses: AryaanSheth/promptlint@v1
+    with:
+      path: 'prompts/'
+      sarif-output: promptlint.sarif
+      fail-level: critical
+
+  - uses: github/codeql-action/upload-sarif@v3
+    with:
+      sarif_file: promptlint.sarif
+    if: always()
+```
+
+### Full workflow — all options, score comment
+
+```yaml
+name: Lint Prompts
+
+on:
+  pull_request:
+    paths:
+      - 'prompts/**'
+      - '**/*.prompt'
+      - '**/*.txt'
+
+jobs:
+  promptlint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run PromptLint
+        id: lint
+        uses: AryaanSheth/promptlint@v1
+        with:
+          path: 'prompts/'
+          fail-level: critical
+          show-score: true
+          sarif-output: promptlint.sarif
+          config: '.github/promptlintrc.yml'
+
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: promptlint.sarif
+        if: always()
+
+      - name: Print score
+        run: echo "Score ${{ steps.lint.outputs.score }}/100 (${{ steps.lint.outputs.grade }})"
+```
+
+### Only run when prompt files change
+
+```yaml
+on:
+  pull_request:
+    paths:
+      - 'prompts/**'
+      - 'src/**/*.prompt'
+      - '**/*.txt'
+```
+
+### Action inputs
+
+| Input | Default | Description |
+|---|---|---|
+| `path` | `.` | File path or glob pattern to scan. Ignored when `prompt` is set. |
+| `prompt` | `` | Inline prompt text to lint. When set, `path` is ignored. |
+| `fail-level` | `critical` | Exit non-zero on: `none` \| `warn` \| `critical` |
+| `config` | `` | Path to `.promptlintrc`. Auto-detects repo root if blank. |
+| `show-score` | `false` | Print A–F health score in the workflow log |
+| `sarif-output` | `` | Write SARIF v2.1.0 for the GitHub Security tab |
+| `annotations` | `true` | Emit inline annotations on the PR diff |
+
+### Action outputs
+
+| Output | Description |
+|---|---|
+| `findings-count` | Total findings across all scanned files |
+| `critical-count` | CRITICAL severity findings |
+| `score` | Health score 0–100 |
+| `grade` | Health grade A–F |
 
 ---
 
 ## GitLab CI
 
-### Basic Pipeline
+### Basic pipeline
 
 `.gitlab-ci.yml`:
 
@@ -163,146 +186,107 @@ stages:
 
 promptlint:
   stage: lint
-  image: python:3.9
-  
-  before_script:
-    - pip install -r requirements.txt
-  
+  image: node:20-slim
   script:
-    - python -m promptlint.cli --file prompts/system_prompt.txt --fail-level warn --format json
-  
-  only:
-    - merge_requests
-    - main
-    - develop
+    - npx promptlint-cli prompts/**/*.txt --fail-level critical --format json
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
 ```
 
-### With Artifacts
+### With artifacts and Python
 
 ```yaml
 stages:
   - lint
-  - report
 
 promptlint:
   stage: lint
-  image: python:3.9
-  
+  image: python:3.11-slim
   before_script:
-    - pip install -r requirements.txt
-  
+    - pip install promptlint-cli
   script:
     - |
       for file in prompts/*.txt; do
-        python -m promptlint.cli \
-          --file "$file" \
-          --format json > "reports/$(basename $file .txt).json"
+        promptlint --file "$file" --fail-level warn --format json \
+          > "reports/$(basename $file .txt).json"
       done
-  
   artifacts:
     paths:
       - reports/
     expire_in: 30 days
-  
-  only:
-    - merge_requests
-    - main
-
-generate-report:
-  stage: report
-  image: python:3.9
-  dependencies:
-    - promptlint
-  
-  script:
-    - python scripts/aggregate_results.py reports/ > summary.txt
-  
-  artifacts:
-    paths:
-      - summary.txt
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
 ```
 
 ---
 
 ## Pre-commit Hooks
 
-### Local Git Hook
+### Using pre-commit framework
 
-Create `.git/hooks/pre-commit`:
+`.pre-commit-config.yaml`:
+
+```yaml
+repos:
+  - repo: local
+    hooks:
+      - id: promptlint
+        name: PromptLint
+        language: system
+        entry: promptlint
+        args: [--fail-level, warn]
+        files: \.(txt|prompt|md)$
+        pass_filenames: true
+```
+
+Install and enable:
+
+```bash
+pip install pre-commit promptlint-cli
+pre-commit install
+```
+
+### Manual git hook
+
+`.git/hooks/pre-commit`:
 
 ```bash
 #!/bin/bash
 
-echo "🔍 Running PromptLint..."
-
-# Find staged prompt files
-STAGED_PROMPTS=$(git diff --cached --name-only --diff-filter=ACM | grep -E 'prompts/.*\.txt$')
+STAGED_PROMPTS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(txt|prompt)$')
 
 if [ -z "$STAGED_PROMPTS" ]; then
-  echo "✅ No prompt files to lint"
   exit 0
 fi
 
-# Lint each file
+echo "Running PromptLint..."
 EXIT_CODE=0
+
 for file in $STAGED_PROMPTS; do
-  echo "  Checking $file..."
-  python -m promptlint.cli --file "$file" --fail-level warn
-  
-  if [ $? -ne 0 ]; then
-    echo "❌ PromptLint failed for $file"
-    EXIT_CODE=1
+  promptlint --file "$file" --fail-level warn || EXIT_CODE=$?
+  if [ $EXIT_CODE -ne 0 ]; then
+    echo "Tip: run 'promptlint --file $file --fix' to auto-fix"
   fi
 done
-
-if [ $EXIT_CODE -eq 0 ]; then
-  echo "✅ PromptLint passed!"
-else
-  echo "❌ PromptLint found issues. Fix them or use --no-verify to skip."
-fi
 
 exit $EXIT_CODE
 ```
 
-Make executable:
 ```bash
 chmod +x .git/hooks/pre-commit
 ```
 
-### With Auto-fix Suggestion
-
-```bash
-#!/bin/bash
-
-echo "🔍 Running PromptLint..."
-
-STAGED_PROMPTS=$(git diff --cached --name-only --diff-filter=ACM | grep -E 'prompts/.*\.txt$')
-
-if [ -z "$STAGED_PROMPTS" ]; then
-  exit 0
-fi
-
-EXIT_CODE=0
-for file in $STAGED_PROMPTS; do
-  python -m promptlint.cli --file "$file" --fail-level warn
-  
-  if [ $? -ne 0 ]; then
-    echo ""
-    echo "💡 Tip: Run 'python -m promptlint.cli --file $file --fix' to auto-fix issues"
-    EXIT_CODE=1
-  fi
-done
-
-exit $EXIT_CODE
-```
-
 ---
 
-## VS Code Integration
+## VS Code
 
-### Task Configuration
+Install the [PromptLint VS Code extension](https://marketplace.visualstudio.com/items?itemName=PromptLint.promptlint-vscode) for real-time inline linting as you write prompts — no terminal needed.
 
-Create `.vscode/tasks.json`:
+### Tasks (without extension)
+
+`.vscode/tasks.json`:
 
 ```json
 {
@@ -311,67 +295,36 @@ Create `.vscode/tasks.json`:
     {
       "label": "PromptLint: Current File",
       "type": "shell",
-      "command": "python",
-      "args": [
-        "-m",
-        "promptlint.cli",
-        "--file",
-        "${file}",
-        "--show-dashboard"
-      ],
-      "group": {
-        "kind": "test",
-        "isDefault": true
-      },
-      "presentation": {
-        "reveal": "always",
-        "panel": "new"
-      }
+      "command": "promptlint",
+      "args": ["--file", "${file}", "--show-dashboard"],
+      "group": { "kind": "test", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "new" }
     },
     {
       "label": "PromptLint: Auto-fix Current File",
       "type": "shell",
-      "command": "python",
-      "args": [
-        "-m",
-        "promptlint.cli",
-        "--file",
-        "${file}",
-        "--fix"
-      ],
+      "command": "promptlint",
+      "args": ["--file", "${file}", "--fix"],
       "group": "test",
-      "presentation": {
-        "reveal": "always",
-        "panel": "new"
-      }
+      "presentation": { "reveal": "always", "panel": "new" }
     },
     {
       "label": "PromptLint: All Prompts",
       "type": "shell",
-      "command": "bash",
-      "args": [
-        "-c",
-        "for file in prompts/*.txt; do python -m promptlint.cli --file \"$file\"; done"
-      ],
+      "command": "promptlint",
+      "args": ["prompts/**/*.txt"],
       "group": "test",
-      "presentation": {
-        "reveal": "always",
-        "panel": "new"
-      }
+      "presentation": { "reveal": "always", "panel": "new" }
     }
   ]
 }
 ```
 
-**Usage:**
-1. Open a prompt file
-2. Press `Ctrl+Shift+P` (Cmd+Shift+P on Mac)
-3. Type "Run Task"
-4. Select "PromptLint: Current File"
+Run with `Ctrl+Shift+P` → "Run Task" → select task.
 
-### Keyboard Shortcut
+### Keyboard shortcuts
 
-Add to `.vscode/keybindings.json`:
+`.vscode/keybindings.json`:
 
 ```json
 [
@@ -381,78 +334,47 @@ Add to `.vscode/keybindings.json`:
     "args": "PromptLint: Current File"
   },
   {
-    "key": "ctrl+shift+f",
+    "key": "ctrl+shift+alt+f",
     "command": "workbench.action.tasks.runTask",
     "args": "PromptLint: Auto-fix Current File"
   }
 ]
 ```
 
-### Problem Matcher
-
-For better error highlighting in VS Code:
-
-```json
-{
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "PromptLint",
-      "type": "shell",
-      "command": "python -m promptlint.cli --file ${file}",
-      "problemMatcher": {
-        "owner": "promptlint",
-        "fileLocation": "relative",
-        "pattern": {
-          "regexp": "^\\[ (INFO|WARN|CRITICAL) \\] ([\\w-]+) \\(line (\\d+)\\) (.*)$",
-          "severity": 1,
-          "code": 2,
-          "line": 3,
-          "message": 4
-        }
-      }
-    }
-  ]
-}
-```
-
 ---
 
 ## Docker
 
-### Dockerfile
+### Simple one-shot scan
+
+```bash
+docker run --rm \
+  -v "$(pwd)/prompts:/prompts:ro" \
+  node:20-slim \
+  sh -c "npx promptlint-cli /prompts/**/*.txt --fail-level critical"
+```
+
+### Dockerfile (for custom images)
 
 ```dockerfile
-FROM python:3.9-slim
-
-WORKDIR /app
-
-# Copy CLI package and install
-COPY cli/ /app/cli/
-WORKDIR /app/cli
-RUN pip install --no-cache-dir -r requirements.txt && pip install -e .
-WORKDIR /app
-ENTRYPOINT ["python", "-m", "promptlint.cli"]
+FROM python:3.11-slim
+RUN pip install --no-cache-dir promptlint-cli
+ENTRYPOINT ["promptlint"]
 CMD ["--help"]
 ```
 
-### Build and Run
-
 ```bash
-# Build image
-docker build -t promptlint:latest .
+docker build -t promptlint .
 
-# Run on local file
-docker run --rm -v $(pwd)/prompts:/prompts promptlint:latest \
-  --file /prompts/system_prompt.txt
+# Scan a directory
+docker run --rm -v "$(pwd)/prompts:/prompts:ro" promptlint \
+  /prompts/system_prompt.txt --fail-level warn
 
-# Run with custom config
+# With config
 docker run --rm \
-  -v $(pwd)/prompts:/prompts \
-  -v $(pwd)/cli/.promptlintrc:/app/.promptlintrc \
-  promptlint:latest \
-  --file /prompts/system_prompt.txt \
-  --show-dashboard
+  -v "$(pwd)/prompts:/prompts:ro" \
+  -v "$(pwd)/.promptlintrc:/.promptlintrc:ro" \
+  promptlint /prompts/system_prompt.txt
 ```
 
 ### Docker Compose
@@ -460,20 +382,19 @@ docker run --rm \
 `docker-compose.yml`:
 
 ```yaml
-version: '3.8'
-
 services:
   promptlint:
-    build: .
+    image: python:3.11-slim
     volumes:
       - ./prompts:/prompts:ro
-      - ./cli/.promptlintrc:/app/.promptlintrc:ro
-    command: --file /prompts/system_prompt.txt --format json
+      - ./.promptlintrc:/.promptlintrc:ro
+    command: >
+      sh -c "pip install -q promptlint-cli &&
+             promptlint /prompts/system_prompt.txt --format json"
 ```
 
-**Usage:**
 ```bash
-docker-compose run --rm promptlint
+docker compose run --rm promptlint
 ```
 
 ---
@@ -482,51 +403,33 @@ docker-compose run --rm promptlint
 
 ### Makefile
 
-`Makefile`:
-
 ```makefile
-.PHONY: lint lint-all fix dashboard help
+.PHONY: lint lint-all fix ci
 
-# Lint single file
 lint:
-	@python -m promptlint.cli --file $(FILE)
+	promptlint --file $(FILE)
 
-# Lint all prompts
 lint-all:
-	@for file in prompts/*.txt; do \
-		echo "Linting $$file..."; \
-		python -m promptlint.cli --file "$$file" --fail-level warn; \
-	done
+	promptlint prompts/**/*.txt
 
-# Auto-fix single file
 fix:
-	@python -m promptlint.cli --file $(FILE) --fix
+	promptlint --file $(FILE) --fix
 
-# Show dashboard
-dashboard:
-	@python -m promptlint.cli --file $(FILE) --show-dashboard
-
-# CI check (strict)
 ci:
-	@python -m promptlint.cli --file prompts/*.txt --fail-level warn --format json
+	promptlint prompts/**/*.txt --fail-level critical --quiet
 
 help:
-	@echo "PromptLint Makefile"
-	@echo ""
 	@echo "Usage:"
-	@echo "  make lint FILE=prompts/system.txt    Lint single file"
-	@echo "  make lint-all                        Lint all prompts"
-	@echo "  make fix FILE=prompts/system.txt     Auto-fix single file"
-	@echo "  make dashboard FILE=prompts/system.txt  Show cost dashboard"
-	@echo "  make ci                              Run CI checks"
+	@echo "  make lint FILE=prompts/system.txt"
+	@echo "  make lint-all"
+	@echo "  make fix  FILE=prompts/system.txt"
+	@echo "  make ci"
 ```
 
-**Usage:**
 ```bash
 make lint FILE=prompts/system_prompt.txt
 make lint-all
-make fix FILE=prompts/system_prompt.txt
-make dashboard FILE=prompts/system_prompt.txt
+make ci
 ```
 
 ### Taskfile
@@ -538,235 +441,127 @@ version: '3'
 
 tasks:
   lint:
-    desc: Lint a prompt file
+    desc: Lint a single prompt file
     cmds:
-      - python -m promptlint.cli --file {{.FILE}}
+      - promptlint --file {{.FILE}}
     requires:
       vars: [FILE]
 
   lint-all:
     desc: Lint all prompt files
     cmds:
-      - for: { var: PROMPTS, split: '\n' }
-        cmd: python -m promptlint.cli --file {{.ITEM}}
-    vars:
-      PROMPTS:
-        sh: find prompts/ -name "*.txt"
+      - promptlint prompts/**/*.txt
 
   fix:
     desc: Auto-fix a prompt file
     cmds:
-      - python -m promptlint.cli --file {{.FILE}} --fix
-    requires:
-      vars: [FILE]
-
-  dashboard:
-    desc: Show cost dashboard
-    cmds:
-      - python -m promptlint.cli --file {{.FILE}} --show-dashboard
+      - promptlint --file {{.FILE}} --fix
     requires:
       vars: [FILE]
 
   ci:
-    desc: CI check (strict mode)
+    desc: CI check (block on CRITICAL)
     cmds:
-      - python -m promptlint.cli --file prompts/*.txt --fail-level warn --format json
+      - promptlint prompts/**/*.txt --fail-level critical --quiet
 ```
 
-**Usage:**
 ```bash
 task lint FILE=prompts/system_prompt.txt
 task lint-all
-task fix FILE=prompts/system_prompt.txt
-task dashboard FILE=prompts/system_prompt.txt
+task ci
 ```
 
 ---
 
-## Custom Integrations
+## Custom Scripts
 
-### Python Script Integration
+### Python — library API
 
 ```python
-#!/usr/bin/env python3
-"""Custom PromptLint integration."""
+from promptlint import analyze, applyFixes, loadConfig
 
-import subprocess
-import json
-import sys
+config = loadConfig()   # reads .promptlintrc
+findings = analyze("Please kindly write some code", config)
 
-def lint_prompt(file_path: str) -> dict:
-    """Run PromptLint on a file and return results."""
-    result = subprocess.run(
-        [
-            'python', '-m', 'promptlint.cli',
-            '--file', file_path,
-            '--format', 'json'
-        ],
-        capture_output=True,
-        text=True
-    )
-    
-    return json.loads(result.stdout)
+critical = [f for f in findings if f["level"] == "CRITICAL"]
+if critical:
+    raise RuntimeError(f"{len(critical)} critical issue(s) found")
 
-def main():
-    # Lint a file
-    results = lint_prompt('prompts/system_prompt.txt')
-    
-    # Check for critical issues
-    critical_issues = [
-        f for f in results['findings']
-        if f['level'] == 'CRITICAL'
-    ]
-    
-    if critical_issues:
-        print(f"❌ Found {len(critical_issues)} critical issues!")
-        for issue in critical_issues:
-            print(f"  - {issue['rule']}: {issue['message']}")
-        sys.exit(1)
-    
-    # Check token count
-    tokens = results['dashboard']['current_tokens']
-    if tokens > 1000:
-        print(f"⚠️  Prompt is large: {tokens} tokens")
-    
-    print("✅ PromptLint checks passed!")
-
-if __name__ == '__main__':
-    main()
+fixed = applyFixes("Please kindly write some code", config)
+print(fixed)
 ```
 
-### Slack Notification
+### Node.js / TypeScript — library API
+
+```typescript
+import { analyze, applyFixes, computeScore, loadConfig } from "promptlint-cli";
+
+const config = loadConfig();
+const text = "Please kindly write some code";
+
+const findings = analyze(text, config);
+const score = computeScore(findings);
+
+console.log(`Grade: ${score.grade} (${score.overall}/100)`);
+
+const critical = findings.filter(f => f.level === "CRITICAL");
+if (critical.length > 0) {
+  process.exit(2);
+}
+
+const fixed = applyFixes(text, config);
+```
+
+### GitHub Actions — use outputs in downstream steps
+
+```yaml
+- name: Run PromptLint
+  id: lint
+  uses: AryaanSheth/promptlint@v1
+  with:
+    path: 'prompts/'
+    fail-level: none   # capture outputs without failing
+
+- name: Post PR comment with score
+  if: github.event_name == 'pull_request'
+  uses: actions/github-script@v7
+  with:
+    script: |
+      const score = '${{ steps.lint.outputs.score }}';
+      const grade = '${{ steps.lint.outputs.grade }}';
+      const critical = '${{ steps.lint.outputs.critical-count }}';
+      github.rest.issues.createComment({
+        issue_number: context.issue.number,
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        body: `## PromptLint Score: ${score}/100 (${grade})\n\n${critical} critical finding(s).`
+      });
+```
+
+### Slack notification
 
 ```python
-#!/usr/bin/env python3
-"""Send PromptLint results to Slack."""
+import subprocess, json, os, requests
 
-import subprocess
-import json
-import requests
-import os
-
-SLACK_WEBHOOK = os.environ.get('SLACK_WEBHOOK_URL')
-
-def lint_and_notify(file_path: str):
-    """Lint file and send results to Slack."""
+def lint_and_notify(path: str):
     result = subprocess.run(
-        ['python', '-m', 'promptlint.cli', '--file', file_path, '--format', 'json'],
-        capture_output=True,
-        text=True
+        ["promptlint", "--file", path, "--format", "json"],
+        capture_output=True, text=True
     )
-    
     data = json.loads(result.stdout)
-    dashboard = data['dashboard']
-    
-    # Build Slack message
-    message = {
-        "text": f"PromptLint Report: {file_path}",
-        "blocks": [
-            {
-                "type": "header",
-                "text": {
-                    "type": "plain_text",
-                    "text": f"📊 PromptLint Report"
-                }
-            },
-            {
-                "type": "section",
-                "fields": [
-                    {
-                        "type": "mrkdwn",
-                        "text": f"*File:*\n{file_path}"
-                    },
-                    {
-                        "type": "mrkdwn",
-                        "text": f"*Tokens:*\n{dashboard['current_tokens']}"
-                    },
-                    {
-                        "type": "mrkdwn",
-                        "text": f"*Savings:*\n{dashboard['reduction_percentage']}%"
-                    },
-                    {
-                        "type": "mrkdwn",
-                        "text": f"*Issues:*\n{len(data['findings'])}"
-                    }
-                ]
-            }
-        ]
-    }
-    
-    # Send to Slack
-    response = requests.post(SLACK_WEBHOOK, json=message)
-    if response.status_code == 200:
-        print("✅ Notification sent to Slack")
-    else:
-        print(f"❌ Failed to send notification: {response.status_code}")
+    critical = sum(1 for f in data["findings"] if f["level"] == "CRITICAL")
 
-if __name__ == '__main__':
-    lint_and_notify('prompts/system_prompt.txt')
-```
-
----
-
-## Analytics Dashboard
-
-### Aggregate Results Script
-
-`scripts/aggregate_results.py`:
-
-```python
-#!/usr/bin/env python3
-"""Aggregate PromptLint results for analytics."""
-
-import json
-import sys
-from pathlib import Path
-from collections import Counter
-
-def aggregate_results(reports_dir: str):
-    """Aggregate JSON reports from multiple files."""
-    reports_path = Path(reports_dir)
-    all_findings = []
-    total_tokens = 0
-    total_savings = 0
-    
-    for report_file in reports_path.glob('*.json'):
-        with open(report_file) as f:
-            data = json.load(f)
-            all_findings.extend(data['findings'])
-            total_tokens += data['dashboard']['current_tokens']
-            total_savings += data['dashboard'].get('tokens_saved', 0)
-    
-    # Statistics
-    level_counts = Counter(f['level'] for f in all_findings)
-    rule_counts = Counter(f['rule'] for f in all_findings)
-    
-    print("=" * 60)
-    print("PromptLint Aggregate Report")
-    print("=" * 60)
-    print(f"\nTotal Files Analyzed: {len(list(reports_path.glob('*.json')))}")
-    print(f"Total Tokens: {total_tokens:,}")
-    print(f"Total Potential Savings: {total_savings:,} tokens")
-    print(f"\nFindings by Level:")
-    for level, count in level_counts.most_common():
-        print(f"  {level:10s}: {count:3d}")
-    print(f"\nTop Issues:")
-    for rule, count in rule_counts.most_common(10):
-        print(f"  {rule:30s}: {count:3d}")
-
-if __name__ == '__main__':
-    aggregate_results(sys.argv[1] if len(sys.argv) > 1 else 'reports/')
-```
-
-**Usage:**
-```bash
-python scripts/aggregate_results.py reports/
+    requests.post(os.environ["SLACK_WEBHOOK_URL"], json={
+        "text": f"PromptLint: {path} — {critical} critical finding(s), "
+                f"{len(data['findings'])} total"
+    })
 ```
 
 ---
 
 ## Next Steps
 
-- **[CLI Reference](cli-reference.md)** - Command-line options
-- **[Configuration Reference](configuration.md)** - Configure behavior
-- **[Best Practices](best-practices.md)** - Write better prompts
+- [CLI Reference](cli-reference.md) — all command-line options
+- [Configuration Reference](configuration.md) — `.promptlintrc` guide
+- [Rules Reference](rules-reference.md) — every rule explained
+- [Best Practices](best-practices.md) — writing production-ready prompts

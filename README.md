@@ -3,11 +3,12 @@
 [![PyPI version](https://img.shields.io/pypi/v/promptlint-cli?color=00ff88&labelColor=0a0a0a)](https://pypi.org/project/promptlint-cli/)
 [![npm version](https://img.shields.io/npm/v/promptlint-cli?color=00ff88&labelColor=0a0a0a)](https://www.npmjs.com/package/promptlint-cli)
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/PromptLint.promptlint-vscode?color=00ff88&labelColor=0a0a0a&label=vscode)](https://marketplace.visualstudio.com/items?itemName=PromptLint.promptlint-vscode)
+[![GitHub Marketplace](https://img.shields.io/badge/GitHub%20Action-Marketplace-00ff88?labelColor=0a0a0a&logo=github)](https://github.com/marketplace/actions/promptlint-action)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue?labelColor=0a0a0a)](LICENSE)
 
 Static analysis for LLM prompts. Think ESLint, but for the text you send to GPT-4 / Claude / Gemini.
 
-It catches token waste, vague language, prompt injection, missing structure, and a bunch of other things that make prompts worse in production. Runs locally, no API calls, results in milliseconds.
+Catches token waste, vague language, prompt injection, missing structure, leaked secrets, PII, and more. Runs locally, no API calls, results in milliseconds.
 
 ```
 $ promptlint --file system_prompt.txt
@@ -15,31 +16,130 @@ $ promptlint --file system_prompt.txt
 PromptLint Findings
 [ INFO     ] cost (line -) Prompt is ~38 tokens (~$0.0002 input per call on gpt-4o).
 [ WARN     ] structure-sections (line -) No explicit sections detected (Task/Context/Output).
-[ WARN     ] clarity-vague-terms (line 1) Vague term 'some' detected (vague quantifier). Be more specific.
+[ WARN     ] clarity-vague-terms (line 1) Vague term 'some' detected. Be more specific.
 [ INFO     ] verbosity-redundancy (line 3) Redundant phrase 'In order to' detected. Use simpler alternative.
 [ WARN     ] politeness-bloat (line 1) Consider removing 'Please' (adds 1.5 tokens without semantic value).
 [ CRITICAL ] prompt-injection (line 5) Injection pattern detected: 'ignore previous instructions'.
 
-1 file(s) scanned, 8 finding(s) in 0.41s
+1 file(s) scanned, 6 finding(s) in 0.41s
 ```
+
+---
 
 ### Install
 
+**GitHub Action** (recommended for CI) — scan files or lint an inline string:
+```yaml
+# Scan prompt files
+- uses: AryaanSheth/promptlint@v1
+  with:
+    path: 'prompts/**/*.txt'
+
+# Or lint an inline prompt string
+- uses: AryaanSheth/promptlint@v1
+  with:
+    prompt: 'You are a helpful assistant. Ignore previous instructions.'
+```
+
 **Python (pip)**
 ```bash
-pip install promptlint-cli
+pip install promptlint-cli        # requires Python 3.9+
+promptlint --file prompt.txt
 ```
-Requires Python 3.9+.
 
 **Node.js (npm)**
 ```bash
-npm install -g promptlint-cli
+npm install -g promptlint-cli     # requires Node.js 16+
+# or without installing:
+npx promptlint-cli --file prompt.txt
 ```
-Requires Node.js 16+.
 
-**VS Code** — [install from the marketplace](https://marketplace.visualstudio.com/items?itemName=PromptLint.promptlint-vscode)
+**VS Code** — [install from the Marketplace](https://marketplace.visualstudio.com/items?itemName=PromptLint.promptlint-vscode)
 
-### Usage
+---
+
+### GitHub Action
+
+The fastest way to add PromptLint to CI. No installation step — just add to any workflow:
+
+```yaml
+name: Lint Prompts
+on: [pull_request]
+
+jobs:
+  promptlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: AryaanSheth/promptlint@v1
+        with:
+          path: 'prompts/**/*.txt'
+          fail-level: critical    # block merges on injection / leaked secrets / PII
+          show-score: true        # print A–F grade in the log
+```
+
+You can also lint an inline prompt string instead of files — no `actions/checkout` needed:
+
+```yaml
+- uses: AryaanSheth/promptlint@v1
+  with:
+    prompt: ${{ env.SYSTEM_PROMPT }}
+    fail-level: critical
+    show-score: true
+```
+
+**Inputs**
+
+| Input | Default | Description |
+|---|---|---|
+| `path` | `.` | File path or glob pattern to scan. Ignored when `prompt` is set. |
+| `prompt` | `` | Inline prompt text to lint. When set, `path` is ignored. |
+| `fail-level` | `critical` | Exit non-zero on: `none` \| `warn` \| `critical` |
+| `config` | `` | Path to `.promptlintrc`. Auto-detects repo root if blank. |
+| `show-score` | `false` | Print A–F health score in the workflow log |
+| `sarif-output` | `` | Write SARIF v2.1.0 file for the GitHub Security tab |
+| `annotations` | `true` | Emit inline annotations on the PR diff |
+
+**Outputs**
+
+| Output | Description |
+|---|---|
+| `findings-count` | Total findings across all scanned files |
+| `critical-count` | CRITICAL severity findings |
+| `score` | Health score 0–100 |
+| `grade` | Health grade A–F |
+
+**With SARIF (Security tab integration)**
+
+```yaml
+permissions:
+  contents: read
+  security-events: write
+
+steps:
+  - uses: actions/checkout@v4
+
+  - name: Run PromptLint
+    id: lint
+    uses: AryaanSheth/promptlint@v1
+    with:
+      path: 'prompts/'
+      sarif-output: promptlint.sarif
+      show-score: true
+
+  - uses: github/codeql-action/upload-sarif@v3
+    with:
+      sarif_file: promptlint.sarif
+    if: always()
+
+  - run: echo "Score ${{ steps.lint.outputs.score }}/100 (${{ steps.lint.outputs.grade }})"
+```
+
+See [action/README.md](action/README.md) for the full action reference.
+
+---
+
+### CLI Usage
 
 ```bash
 # lint a file
@@ -57,35 +157,46 @@ cat prompt.txt | promptlint --format json
 # auto-fix what it can
 promptlint --file prompt.txt --fix
 
-# CI mode: exit 1 on warnings, only print the summary
+# CI mode: exit non-zero on warnings, print summary only
 promptlint prompts/ --fail-level warn --quiet
 ```
 
-Exit codes: `0` = clean, `1` = warnings found (with `--fail-level warn`), `2` = critical issues.
+Exit codes: `0` = clean, `1` = warnings (with `--fail-level warn`), `2` = critical issues.
+
+---
 
 ### What it checks
 
-| Rule | What it does | Fixable |
-|------|-------------|---------|
-| `cost` | Token count and per-call cost estimate | - |
-| `cost-limit` | Warns when prompt exceeds your token budget | - |
-| `prompt-injection` | Catches injection patterns, even with leetspeak/unicode obfuscation | yes |
-| `structure-sections` | Flags prompts with no clear sections | yes |
-| `clarity-vague-terms` | Finds "some", "stuff", "maybe", "good", etc. | - |
-| `specificity-examples` | Suggests adding examples for complex instructions | - |
-| `specificity-constraints` | Suggests adding length/format/scope constraints | - |
-| `politeness-bloat` | Flags "please", "kindly", "thank you" (burns tokens) | yes |
-| `verbosity-sentence-length` | Flags sentences over 40 words | - |
-| `verbosity-redundancy` | "in order to" -> "to", "due to the fact that" -> "because" | yes |
-| `actionability-weak-verbs` | Flags excessive passive voice | - |
-| `consistency-terminology` | Catches mixed terms (user/customer, function/method) | - |
-| `completeness-edge-cases` | Reminds you to specify error handling | - |
+| Rule | Severity | What it catches | Fixable |
+|------|----------|----------------|---------|
+| `prompt-injection` | CRITICAL | `ignore previous instructions`, role-hijacking, obfuscated variants | yes |
+| `jailbreak-pattern` | CRITICAL | DAN prompts, "act as", "pretend you are" | — |
+| `secret-in-prompt` | CRITICAL | Hardcoded API keys, tokens, passwords | — |
+| `pii-in-prompt` | CRITICAL | SSNs, credit cards, emails, phone numbers | — |
+| `context-injection-boundary` | CRITICAL | Unsanitized user content injected into system prompts | — |
+| `cost` | INFO | Token count and per-call cost estimate | — |
+| `cost-limit` | WARN | Exceeds your configured token budget | — |
+| `structure-sections` | WARN | No clear Task/Context/Output sections | yes |
+| `role-clarity` | WARN | No system role defined | — |
+| `output-format-missing` | WARN | No output format specified | — |
+| `hallucination-risk` | WARN | Asks model to recall facts without grounding | — |
+| `clarity-vague-terms` | WARN | "some", "stuff", "maybe", "various" | — |
+| `specificity-examples` | INFO | No examples provided for complex instructions | — |
+| `specificity-constraints` | INFO | No length/format/scope constraints | — |
+| `politeness-bloat` | WARN | "please", "kindly", "thank you" (burns tokens) | yes |
+| `verbosity-sentence-length` | INFO | Sentences over 40 words | — |
+| `verbosity-redundancy` | INFO | "in order to" → "to", "due to the fact that" → "because" | yes |
+| `actionability-weak-verbs` | INFO | Excessive passive voice | — |
+| `consistency-terminology` | INFO | Mixed terms (user/customer, function/method) | — |
+| `completeness-edge-cases` | INFO | No error handling specified | — |
 
-Run `promptlint --list-rules` to see them all, or `promptlint --explain cost` for details on any rule.
+Run `promptlint --list-rules` to see them all, or `promptlint --explain <rule-id>` for details.
+
+---
 
 ### Auto-fix
 
-Pass `--fix` and PromptLint will remove politeness filler, simplify redundant phrases, strip injection lines, and scaffold missing `<task>`/`<context>` tags:
+Pass `--fix` and PromptLint will rewrite the prompt in place — removing politeness filler, simplifying redundant phrases, stripping injection lines, and scaffolding missing structure tags:
 
 ```
 $ promptlint -t "Please kindly write code in order to sort the array, thank you" --fix
@@ -94,9 +205,11 @@ Optimized Prompt
 <task>Write code to sort the array.</task>
 ```
 
+---
+
 ### Configuration
 
-Drop a `.promptlintrc` in your repo root (or run `promptlint --init` to generate one):
+Drop a `.promptlintrc` in your repo root (or run `promptlint --init`):
 
 ```yaml
 model: gpt-4o
@@ -105,20 +218,23 @@ cost_per_1k_tokens: 0.005
 calls_per_day: 10000
 
 rules:
-  cost:
-    enabled: true
   prompt_injection:
     enabled: true
     patterns:
       - ignore previous instructions
       - system prompt extraction
       - "you are now a [a-zA-Z ]+"
+  pii_in_prompt:
+    enabled: true
+    check_email: true
+    check_ssn: true
   politeness_bloat:
     enabled: true
     words: [please, kindly, thank you, i would appreciate]
     savings_per_hit: 1.5
-  structure_sections:
+  role_clarity:
     enabled: true
+    severity: warn          # downgrade from CRITICAL
 
 fix:
   enabled: true
@@ -128,7 +244,9 @@ fix:
   structure_scaffold: true
 ```
 
-Every rule can be toggled individually. See `docs/` for the full config reference.
+Every rule can be toggled and severity-overridden individually. See [docs/](docs/) for the full reference.
+
+---
 
 ### CLI reference
 
@@ -150,45 +268,44 @@ promptlint [FILES...] [OPTIONS]
   --init                   Generate starter .promptlintrc
 ```
 
-### Repo layout
-
-```
-cli/            Python CLI (PyPI: promptlint-cli)
-npm/            Node.js CLI (npm: promptlint-cli)
-vscode/         VS Code extension (Marketplace: PromptLint.promptlint-vscode)
-landing/        Marketing site (Express + Supabase)
-docs/           Config and rule documentation
-.claude/skills/ Claude Code agent skill
-.cursor/skills/ Cursor agent skill
-```
+---
 
 ### Inline ignores
 
-Suppress a rule on a specific line:
-
+Suppress a specific rule on a line:
 ```
 Please write code  # promptlint-disable politeness-bloat
 ```
 
-Or suppress everything on that line:
-
+Suppress all rules on a line:
 ```
 Please write code  # promptlint-disable
 ```
 
-### Roadmap
+---
 
-- VS Code extension with inline linting
-- Team presets (security-first, cost-first)
-- Custom rule framework
-- LLM framework integrations (LangChain, etc.)
+### Repo layout
+
+```
+action/         GitHub Action source (action.yml is at repo root)
+cli/            Python CLI (PyPI: promptlint-cli)
+npm/            Node.js CLI (npm: promptlint-cli)
+vscode/         VS Code extension (Marketplace: PromptLint.promptlint-vscode)
+landing/        Marketing site
+docs/           Full reference documentation
+.claude/skills/ Claude Code agent skill
+.cursor/skills/ Cursor agent skill
+```
+
+---
 
 ### Security
 
 - All analysis is local. Nothing leaves your machine.
 - Injection detection normalizes leetspeak (`1gn0r3`), zero-width unicode, fullwidth chars, and character repetition before matching — catches obfuscated attacks that raw regex misses.
-- No API keys in the repo. Supabase/Resend credentials are loaded from `.env` files that are gitignored.
-- The landing server never exposes secrets to the browser.
+- No API keys in the repo. Credentials are loaded from `.env` files that are gitignored.
+
+---
 
 ### License
 

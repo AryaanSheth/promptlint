@@ -8,9 +8,14 @@ branding:
 
 inputs:
   path:
-    description: 'Files or glob pattern to lint (e.g. prompts/**/*.txt)'
+    description: 'Files or glob pattern to lint (e.g. prompts/**/*.txt). Ignored when prompt is set.'
     required: false
     default: '.'
+
+  prompt:
+    description: 'Inline prompt text to lint directly. When set, path is ignored.'
+    required: false
+    default: ''
 
   fail-level:
     description: 'Minimum severity that causes a non-zero exit: none | warn | critical'

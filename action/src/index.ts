@@ -5,11 +5,14 @@ import * as path from "path";
 import { analyze, computeScore, loadConfig } from "promptlint-cli";
 import type { Finding } from "promptlint-cli";
 
+const INLINE_SOURCE = "<inline-prompt>";
+
 interface FileFinding extends Finding {
   filePath: string;
 }
 
 async function run(): Promise<void> {
+  const promptInput = core.getInput("prompt");
   const pattern = core.getInput("path") || ".";
   const failLevel = core.getInput("fail-level") || "critical";
   const configInput = core.getInput("config");
@@ -19,56 +22,65 @@ async function run(): Promise<void> {
 
   const workspaceRoot = process.env.GITHUB_WORKSPACE || process.cwd();
 
-  // ── Resolve files ───────────────────────────────────────────────────────
-
-  const globber = await glob.create(pattern, { followSymbolicLinks: false });
-  const matched = await globber.glob();
-
-  const promptFiles = matched.filter((f) => {
-    try {
-      return fs.statSync(f).isFile();
-    } catch {
-      return false;
-    }
-  });
-
-  if (promptFiles.length === 0) {
-    core.warning(`PromptLint: no files matched pattern "${pattern}"`);
-    core.setOutput("findings-count", 0);
-    core.setOutput("critical-count", 0);
-    core.setOutput("score", 100);
-    core.setOutput("grade", "A");
-    return;
-  }
-
-  core.info(`PromptLint: scanning ${promptFiles.length} file(s)...`);
-
-  // ── Load config ─────────────────────────────────────────────────────────
-
   const config = loadConfig(configInput || undefined);
-
-  // ── Analyze ─────────────────────────────────────────────────────────────
-
   const allFindings: FileFinding[] = [];
-  const MAX_BYTES = 10 * 1024 * 1024;
+  let sourcesScanned = 0;
 
-  for (const filePath of promptFiles) {
-    let text: string;
-    try {
-      const stat = fs.statSync(filePath);
-      if (stat.size > MAX_BYTES) {
-        core.warning(`Skipping ${filePath}: exceeds 10 MB limit`);
+  // ── Mode: inline prompt string ───────────────────────────────────────────
+
+  if (promptInput) {
+    core.info("PromptLint: linting inline prompt text...");
+    const findings = analyze(promptInput, config);
+    for (const f of findings) {
+      allFindings.push({ ...f, filePath: INLINE_SOURCE });
+    }
+    sourcesScanned = 1;
+  } else {
+    // ── Mode: file / glob ────────────────────────────────────────────────────
+
+    const globber = await glob.create(pattern, { followSymbolicLinks: false });
+    const matched = await globber.glob();
+
+    const promptFiles = matched.filter((f) => {
+      try {
+        return fs.statSync(f).isFile();
+      } catch {
+        return false;
+      }
+    });
+
+    if (promptFiles.length === 0) {
+      core.warning(`PromptLint: no files matched pattern "${pattern}"`);
+      core.setOutput("findings-count", 0);
+      core.setOutput("critical-count", 0);
+      core.setOutput("score", 100);
+      core.setOutput("grade", "A");
+      return;
+    }
+
+    core.info(`PromptLint: scanning ${promptFiles.length} file(s)...`);
+    sourcesScanned = promptFiles.length;
+
+    const MAX_BYTES = 10 * 1024 * 1024;
+
+    for (const filePath of promptFiles) {
+      let text: string;
+      try {
+        const stat = fs.statSync(filePath);
+        if (stat.size > MAX_BYTES) {
+          core.warning(`Skipping ${filePath}: exceeds 10 MB limit`);
+          continue;
+        }
+        text = fs.readFileSync(filePath, "utf8");
+      } catch (err) {
+        core.warning(`Could not read ${filePath}: ${err}`);
         continue;
       }
-      text = fs.readFileSync(filePath, "utf8");
-    } catch (err) {
-      core.warning(`Could not read ${filePath}: ${err}`);
-      continue;
-    }
 
-    const findings = analyze(text, config);
-    for (const f of findings) {
-      allFindings.push({ ...f, filePath });
+      const findings = analyze(text, config);
+      for (const f of findings) {
+        allFindings.push({ ...f, filePath });
+      }
     }
   }
 
@@ -79,17 +91,17 @@ async function run(): Promise<void> {
       // Skip cost/token INFO findings — too noisy for PR annotations
       if (f.rule === "cost" && f.level === "INFO") continue;
 
-      const relPath = path
-        .relative(workspaceRoot, f.filePath)
-        .replace(/\\/g, "/");
-
-      const lineNum =
-        typeof f.line === "number" ? f.line : undefined;
+      const isInline = f.filePath === INLINE_SOURCE;
+      const lineNum = typeof f.line === "number" ? f.line : undefined;
 
       const props: core.AnnotationProperties = {
-        file: relPath,
-        startLine: lineNum,
         title: `PromptLint [${f.rule}]`,
+        ...(isInline
+          ? {}
+          : {
+              file: path.relative(workspaceRoot, f.filePath).replace(/\\/g, "/"),
+              startLine: lineNum,
+            }),
       };
 
       if (f.level === "CRITICAL") core.error(f.message, props);
@@ -134,8 +146,11 @@ async function run(): Promise<void> {
   core.setOutput("score", score.overall);
   core.setOutput("grade", score.grade);
 
+  const sourceLabel = promptInput
+    ? "inline prompt"
+    : `${sourcesScanned} file(s)`;
   core.info(
-    `PromptLint: ${promptFiles.length} file(s) scanned — ` +
+    `PromptLint: ${sourceLabel} scanned — ` +
       `${allFindings.length} finding(s), ${critCount} CRITICAL`
   );
 
@@ -158,7 +173,6 @@ function buildSarif(
   findings: FileFinding[],
   workspaceRoot: string
 ): object {
-  // Unique rule IDs
   const ruleIds = [...new Set(findings.map((f) => f.rule))];
 
   const rules = ruleIds.map((id) => ({
@@ -173,9 +187,10 @@ function buildSarif(
   }));
 
   const results = findings.map((f) => {
-    const relPath = path
-      .relative(workspaceRoot, f.filePath)
-      .replace(/\\/g, "/");
+    const isInline = f.filePath === INLINE_SOURCE;
+    const uri = isInline
+      ? "inline://prompt"
+      : path.relative(workspaceRoot, f.filePath).replace(/\\/g, "/");
 
     const sarifLevel =
       f.level === "CRITICAL" ? "error" :
@@ -189,8 +204,8 @@ function buildSarif(
         {
           physicalLocation: {
             artifactLocation: {
-              uri: relPath,
-              uriBaseId: "%SRCROOT%",
+              uri,
+              ...(isInline ? {} : { uriBaseId: "%SRCROOT%" }),
             },
             ...(typeof f.line === "number"
               ? { region: { startLine: f.line } }
