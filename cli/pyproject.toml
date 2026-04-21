@@ -34,6 +34,7 @@ dependencies = [
 
 [project.optional-dependencies]
 tiktoken = ["tiktoken~=0.5"]
+dev = ["pytest", "pytest-cov", "hypothesis"]
 
 [project.urls]
 Homepage = "https://github.com/AryaanSheth/promptlint"
@@ -48,3 +49,30 @@ include = ["promptlint*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slow: marks tests as slow benchmarks (deselect with -m 'not slow')",
+]
+
+[tool.coverage.run]
+source = ["promptlint"]
+omit = [
+    "tests/*",
+    "promptlint/cli.py",       # tested via subprocess — coverage tool can't see into subprocesses
+    "promptlint/io.py",        # tested via subprocess
+    "promptlint/output.py",    # tested via subprocess
+    "promptlint/__main__.py",  # trivial two-line entry point
+]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+
+[tool.mypy]
+python_version = "3.9"
+ignore_missing_imports = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = []

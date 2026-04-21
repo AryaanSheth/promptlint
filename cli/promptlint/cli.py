@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import glob as globmod
 import json
 import re
 import sys
@@ -10,10 +9,24 @@ from pathlib import Path
 from typing import List, Optional
 
 from rich.console import Console
-from rich.table import Table
 
 from . import __version__
+from .autofix import (
+    _apply_politeness_fix,
+    _apply_structure_scaffold,
+    _fix_redundancy,
+    _remove_injection_content,
+)
+from .constants import MAX_INPUT_BYTES
 from .engine import LintEngine, compute_score
+from .io import _read_input, _resolve_files
+from .output import (
+    _build_sarif,
+    _render_dashboard,
+    _render_findings,
+    _render_rules_table,
+    _render_score,
+)
 from .rules.registry import ALL_RULES, RULE_MAP
 from .utils.config import PromptlintConfig, load_config
 
@@ -99,61 +112,6 @@ fix:
   structure_scaffold: true
 """
 
-# ── Input helpers ───────────────────────────────────────────────────────
-
-
-_MAX_INPUT_BYTES = 10 * 1024 * 1024  # 10 MB
-
-
-def _read_input(text: str, file_path: Optional[Path]) -> str:
-    if text.strip():
-        return text.replace("\\n", "\n")
-    if file_path:
-        size = file_path.stat().st_size
-        if size > _MAX_INPUT_BYTES:
-            raise ValueError(
-                f"Input file is {size:,} bytes — exceeds 10 MB safety limit."
-            )
-        return file_path.read_text(encoding="utf-8")
-    if not sys.stdin.isatty():
-        data = sys.stdin.read(_MAX_INPUT_BYTES + 1)
-        if len(data) > _MAX_INPUT_BYTES:
-            raise ValueError("Stdin input exceeds 10 MB safety limit.")
-        return data
-    raise ValueError("Provide --text, --file, or pipe input via stdin.")
-
-
-def _resolve_files(
-    positional: List[str],
-    file_flag: Optional[Path],
-    exclude: List[str],
-) -> List[Path]:
-    """Build a deduplicated list of files from positional globs + --file."""
-    paths: list[Path] = []
-    seen: set[str] = set()
-
-    if file_flag:
-        resolved = file_flag.resolve()
-        paths.append(resolved)
-        seen.add(str(resolved))
-
-    for pattern in positional:
-        for match in sorted(globmod.glob(pattern, recursive=True)):
-            p = Path(match).resolve()
-            if p.is_file() and str(p) not in seen:
-                paths.append(p)
-                seen.add(str(p))
-
-    if exclude:
-        excluded: set[str] = set()
-        for ex_pat in exclude:
-            for match in globmod.glob(ex_pat, recursive=True):
-                excluded.add(str(Path(match).resolve()))
-        paths = [p for p in paths if str(p) not in excluded]
-
-    return paths
-
-
 # ── Inline-ignore support ──────────────────────────────────────────────
 
 _DISABLE_RE = re.compile(
@@ -189,302 +147,6 @@ def _filter_disabled(results: list[dict], text: str) -> list[dict]:
             continue
         filtered.append(r)
     return filtered
-
-
-# ── Rendering ───────────────────────────────────────────────────────────
-
-
-def _render_findings(results: list[dict], quiet: bool = False) -> None:
-    if quiet:
-        return
-
-    level_style = {
-        "INFO": "cyan",
-        "WARN": "yellow",
-        "CRITICAL": "red",
-    }
-
-    console.print("PromptLint Findings")
-    for result in results:
-        level = result.get("level", "INFO")
-        style = level_style.get(level, "white")
-        rule = result.get("rule", "")
-        line = str(result.get("line", "-"))
-        message = result.get("message", "")
-        context = result.get("context", "")
-        console.print(
-            f"[{style}][ {level:<8} ][/{style}] {rule} (line {line}) {message}"
-        )
-        if context and line != "-":
-            console.print(context)
-
-
-def _render_dashboard(
-    tokens: int,
-    optimized_tokens: float,
-    cost_per_1k: float,
-    calls_per_day: int,
-) -> None:
-    optimized_tokens = int(max(optimized_tokens, 0))
-    tokens_saved = tokens - optimized_tokens
-    reduction_pct = (tokens_saved / tokens * 100) if tokens > 0 else 0
-
-    current_cost_per_call = (tokens / 1000.0) * cost_per_1k
-    optimized_cost_per_call = (optimized_tokens / 1000.0) * cost_per_1k
-    savings_per_call = current_cost_per_call - optimized_cost_per_call
-
-    console.print("Savings Dashboard")
-    console.print(f"Current Tokens: {tokens}")
-    console.print(
-        f"Optimized Tokens: {optimized_tokens} ({reduction_pct:.1f}% reduction)"
-    )
-    console.print(f"Savings per Call: ~${savings_per_call:.4f}")
-
-    if calls_per_day < 100_000:
-        daily_savings = savings_per_call * calls_per_day
-        monthly_savings = daily_savings * 30
-        annual_savings = daily_savings * 365
-        console.print(
-            f"Monthly Savings: ~${monthly_savings:,.2f} at {calls_per_day:,} calls/day"
-        )
-        console.print(f"Annual Savings: ~${annual_savings:,.2f}")
-
-
-# ── Auto-fix helpers ────────────────────────────────────────────────────
-
-
-def _normalize_spacing_and_punctuation(text: str) -> str:
-    updated = text
-    updated = re.sub(r"[ \t]{2,}", " ", updated)
-    updated = re.sub(r"\s+([,.;:!?])", r"\1", updated)
-    updated = re.sub(r"[,.;:!?]*\?[,.;:!?]*", "?", updated)
-    updated = re.sub(r"[,.;:!]*![,.;:!]*", "!", updated)
-    updated = re.sub(r"[,.;:]*\.[,.;:]*", ".", updated)
-    updated = re.sub(r"[,;:]+([.!?])", r"\1", updated)
-    updated = re.sub(r"([.!?])[,;:]+", r"\1", updated)
-    updated = re.sub(r"[,;:]{2,}", ",", updated)
-    updated = re.sub(r"[.]{2,}", ".", updated)
-    updated = re.sub(r"[,]{2,}", ",", updated)
-    updated = re.sub(r"[!]{2,}", "!", updated)
-    updated = re.sub(r"[?]{2,}", "?", updated)
-    updated = re.sub(r"(?:^|\n)\s*[,;:.!?]\s*", r"\n", updated)
-    updated = re.sub(
-        r"\s+(?:and|or|but)\s*([.!?,;:])", r"\1", updated, flags=re.IGNORECASE
-    )
-    updated = re.sub(
-        r"\s+(?:for|to|from|with|at|by|in|on)\s*([.!?,;:])",
-        r"\1",
-        updated,
-        flags=re.IGNORECASE,
-    )
-    updated = re.sub(r"([.!?])\s*\1+", r"\1", updated)
-    updated = re.sub(r"([.!?])\s*,", r"\1", updated)
-
-    if updated and updated[0].islower():
-        updated = updated[0].upper() + updated[1:]
-
-    def _cap(m):
-        return m.group(1) + " " + m.group(2).upper()
-
-    updated = re.sub(r"([.!?])\s+([a-z])", _cap, updated)
-    updated = re.sub(r"\n{3,}", "\n\n", updated)
-
-    lines = []
-    for line in updated.splitlines():
-        stripped = line.strip()
-        if stripped and not re.fullmatch(r"[.\-_,;:!?\s]+", stripped):
-            lines.append(line)
-
-    return "\n".join(lines)
-
-
-def _apply_politeness_fix(text: str, words: list[str]) -> str:
-    if not words:
-        return text
-    escaped = [re.escape(w) for w in words]
-    pattern = r"(?<!\w)(?:" + "|".join(escaped) + r")(?!\w)"
-    updated = re.sub(pattern, "", text, flags=re.IGNORECASE)
-
-    fragment_patterns = [
-        r"\b(?:for|to)\s+(?:your|the)\s+(?:help|time|effort|assistance|consideration)\s*[.!?]*",
-        r"\b(?:i\s+would\s+appreciate|would\s+appreciate)\s*[.!?]*",
-        r"\b(?:be\s+so\s+kind\s+as\s+to)\s*[.!?]*",
-        r"\b(?:for)\s+(?:implementing|doing|creating|making|writing)\s+(?:this|that)\s*",
-        r"\b(?:very\s+much|so\s+much)\s*[.!?,;:]*",
-    ]
-    for frag in fragment_patterns:
-        updated = re.sub(frag, "", updated, flags=re.IGNORECASE)
-
-    updated = _normalize_spacing_and_punctuation(updated)
-    return updated.strip()
-
-
-def _remove_injection_content(text: str, patterns: list[str]) -> str:
-    if not patterns:
-        return text
-    lines = text.splitlines()
-    filtered = []
-    for line in lines:
-        is_injection = False
-        for p in patterns:
-            try:
-                if re.search(p, line, re.IGNORECASE):
-                    is_injection = True
-                    break
-            except re.error:
-                continue
-        if not is_injection:
-            filtered.append(line)
-    updated = "\n".join(filtered)
-    updated = re.sub(r"\band\b(?=\s*[.!,?]|$)", "", updated, flags=re.IGNORECASE)
-    updated = _normalize_spacing_and_punctuation(updated)
-    return updated.strip()
-
-
-def _apply_structure_scaffold(text: str, required_tags: list[str]) -> str:
-    if not required_tags:
-        return text
-    missing = [
-        tag
-        for tag in required_tags
-        if not re.search(rf"<{re.escape(tag)}\b[^>]*>", text, re.IGNORECASE)
-    ]
-    if not missing:
-        return text
-
-    out_lines: list[str] = []
-    lower_text = text.lower()
-    content_wrapped = False
-
-    for tag in missing:
-        if tag.lower() == "task" and not content_wrapped:
-            out_lines.append(f"<task>{text.strip()}</task>")
-            content_wrapped = True
-        elif tag.lower() == "context":
-            if "context:" in lower_text or "context " in lower_text:
-                out_lines.append("<context></context>")
-        elif tag.lower() == "output_format":
-            if "output_format" in lower_text or "output format" in lower_text:
-                out_lines.append("<output_format></output_format>")
-        else:
-            out_lines.append(f"<{tag}></{tag}>")
-
-    if not content_wrapped:
-        scaffold = "\n".join(out_lines)
-        return f"{scaffold}\n\n{text.strip()}" if scaffold else text
-    return "\n".join(out_lines)
-
-
-def _fix_redundancy(text: str) -> str:
-    replacements = [
-        (r"\bin order to\b", "to"),
-        (r"\bdue to the fact that\b", "because"),
-        (r"\bat this point in time\b", "now"),
-        (r"\bfor the purpose of\b", "for"),
-        (r"\bin the event that\b", "if"),
-        (r"\bprior to\b", "before"),
-        (r"\bsubsequent to\b", "after"),
-        (r"\ba total of\b", ""),
-        (r"\beach and every\b", "every"),
-        (r"\bfirst and foremost\b", "first"),
-        (r"\bfuture plans\b", "plans"),
-        (r"\bpast history\b", "history"),
-        (r"\bend result\b", "result"),
-        (r"\bbasic fundamentals\b", "fundamentals"),
-        (r"\bclose proximity\b", "proximity"),
-        (r"\bgather together\b", "gather"),
-        (r"\bjoin together\b", "join"),
-        (r"\brefer back\b", "refer"),
-        (r"\breturn back\b", "return"),
-        (r"\bunexpected surprise\b", "surprise"),
-        (r"\bcompletely eliminate\b", "eliminate"),
-        (r"\bcompletely finished\b", "finished"),
-        (r"\badvance planning\b", "planning"),
-        (r"\bpast experience\b", "experience"),
-        (r"\bnew innovation\b", "innovation"),
-        (r"\bpersonal opinion\b", "opinion"),
-        (r"\brepeat again\b", "repeat"),
-        (r"\bstill remains\b", "remains"),
-        (r"\btrue fact\b", "fact"),
-        (r"\bwith the exception of\b", "except"),
-        (r"\bin close proximity to\b", "near"),
-        (r"\bhas the ability to\b", "can"),
-        (r"\bis able to\b", "can"),
-        (r"\bin spite of the fact that\b", "although"),
-        (r"\bwith regard to\b", "about"),
-        (r"\bin relation to\b", "about"),
-        (r"\bfor the reason that\b", "because"),
-        (r"\bin the near future\b", "soon"),
-        (r"\bat the present time\b", "now"),
-        (r"\buntil such time as\b", "until"),
-        (r"\bon a (daily|weekly|monthly) basis\b", r"\1"),
-    ]
-    updated = text
-    for pat, repl in replacements:
-        updated = re.sub(pat, repl, updated, flags=re.IGNORECASE)
-    return _normalize_spacing_and_punctuation(updated)
-
-
-# ── Score rendering ──────────────────────────────────────────────────────
-
-
-def _render_score(score: dict) -> None:
-    overall = score["overall"]
-    grade = score["grade"]
-    cats = score["categories"]
-    console.print(f"\nPromptLint Score: [bold]{overall}/100[/bold]  (Grade: {grade})")
-    for cat, val in cats.items():
-        icon = "✓" if val >= 80 else "⚠"
-        console.print(f"  {cat.capitalize():<14} {val:>3}/100  {icon}")
-
-
-# ── SARIF output ────────────────────────────────────────────────────────
-
-
-def _build_sarif(all_results: list[dict], file_map: dict[str, list[dict]]) -> dict:
-    _sev_map = {"CRITICAL": "error", "WARN": "warning", "INFO": "note"}
-    sarif_results = []
-    for uri, findings in file_map.items():
-        for f in findings:
-            line = f.get("line", "-")
-            location: dict = {"artifactLocation": {"uri": uri}}
-            if isinstance(line, int):
-                location["region"] = {"startLine": line}
-            sarif_results.append(
-                {
-                    "ruleId": f.get("rule", "unknown"),
-                    "level": _sev_map.get(f.get("level", "INFO"), "note"),
-                    "message": {"text": f.get("message", "")},
-                    "locations": [{"physicalLocation": location}],
-                }
-            )
-
-    from .rules.registry import ALL_RULES
-    sarif_rules = [
-        {
-            "id": r.id,
-            "shortDescription": {"text": r.short},
-            "defaultConfiguration": {"level": _sev_map.get(r.default_severity, "note")},
-        }
-        for r in ALL_RULES
-    ]
-
-    return {
-        "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
-        "version": "2.1.0",
-        "runs": [
-            {
-                "tool": {
-                    "driver": {
-                        "name": "PromptLint",
-                        "version": __version__,
-                        "rules": sarif_rules,
-                    }
-                },
-                "results": sarif_results,
-            }
-        ],
-    }
 
 
 # ── Severity / exit-code helpers ────────────────────────────────────────
@@ -616,7 +278,7 @@ def _run_lint(
 
     if files:
         for fp in files:
-            if fp.stat().st_size > _MAX_INPUT_BYTES:
+            if fp.stat().st_size > MAX_INPUT_BYTES:
                 err = Console(stderr=True)
                 err.print(
                     f"[red]Skipping {fp}: exceeds 10 MB safety limit.[/red]"
@@ -682,22 +344,7 @@ def _run_lint(
 
 
 def _cmd_list_rules() -> None:
-    table = Table(title="PromptLint Rules", show_lines=False)
-    table.add_column("ID", style="cyan", no_wrap=True)
-    table.add_column("Category", style="magenta")
-    table.add_column("Severity", style="yellow")
-    table.add_column("Fix", justify="center")
-    table.add_column("Description")
-
-    for r in ALL_RULES:
-        table.add_row(
-            r.id,
-            r.category,
-            r.default_severity,
-            "yes" if r.fixable else "-",
-            r.short,
-        )
-    console.print(table)
+    _render_rules_table(ALL_RULES)
 
 
 def _cmd_explain(rule_id: str) -> None:

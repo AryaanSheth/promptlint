@@ -1,13 +1,13 @@
-"""Tests for auto-fix functions in cli.py."""
+"""Tests for auto-fix functions in autofix.py."""
 
 from __future__ import annotations
 
-from promptlint.cli import (
-    _normalize_spacing_and_punctuation,
+from promptlint.autofix import (
     _apply_politeness_fix,
-    _remove_injection_content,
     _apply_structure_scaffold,
     _fix_redundancy,
+    _normalize_spacing_and_punctuation,
+    _remove_injection_content,
 )
 
 

@@ -1,0 +1,44 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.9
+    hooks:
+      - id: bandit
+        args: [-ll, -q]
+        files: ^cli/promptlint/
+        exclude: ^cli/tests/
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.10.0
+    hooks:
+      - id: mypy
+        args: [--ignore-missing-imports]
+        files: ^cli/promptlint/
+        additional_dependencies: [pyyaml, rich]
+
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint (npm)
+        language: node
+        entry: bash -c 'cd npm && npm run lint'
+        files: ^npm/src/.*\.ts$
+        pass_filenames: false
+
+      - id: rule-parity
+        name: Rule parity check
+        language: python
+        entry: bash -c 'cd cli && python -m pytest tests/test_parity.py -q'
+        files: ^(rules-manifest\.json|cli/promptlint/rules/registry\.py|npm/src/engine\.ts)$
+        pass_filenames: false
+        additional_dependencies: [pyyaml, rich]

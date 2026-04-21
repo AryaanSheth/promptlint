@@ -202,6 +202,33 @@ function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/**
+ * Canonical list of every rule ID this engine implements.
+ * Must match rules-manifest.json at the repo root — the CI parity step validates this.
+ */
+export const RULE_IDS: readonly string[] = [
+  "cost",
+  "cost-limit",
+  "prompt-injection",
+  "structure-sections",
+  "clarity-vague-terms",
+  "specificity-examples",
+  "specificity-constraints",
+  "politeness-bloat",
+  "verbosity-sentence-length",
+  "verbosity-redundancy",
+  "actionability-weak-verbs",
+  "consistency-terminology",
+  "completeness-edge-cases",
+  "jailbreak-pattern",
+  "role-clarity",
+  "output-format-missing",
+  "pii-in-prompt",
+  "secret-in-prompt",
+  "hallucination-risk",
+  "context-injection-boundary",
+];
+
 // ── Prompt health score ──────────────────────────────────────────────────
 
 const SECURITY_RULES = new Set([

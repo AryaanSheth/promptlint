@@ -13,7 +13,10 @@ export interface Finding {
   savings?: number;
 }
 
-/** Approximate token count: chars / 4 is a standard heuristic. */
+/**
+ * Estimate token count using the ~4 chars/token heuristic (±15% vs tiktoken).
+ * For accurate counts install the Python CLI, which uses tiktoken.
+ */
 export function countTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
@@ -30,7 +33,7 @@ export function checkTokens(text: string, config: PromptlintConfig): Finding[] {
   const results: Finding[] = [];
 
   if (costEnabled) {
-    let message = `Prompt is ~${tokens} tokens (~$${costPerCall.toFixed(4)} input per call on ${config.model}).`;
+    let message = `Prompt is ~${tokens} tokens (estimated, ±15%) — ~$${costPerCall.toFixed(4)} input per call on ${config.model}. Use the Python CLI for tiktoken-accurate counts.`;
     if (config.callsPerDay < 100_000) {
       const dailyCost = costPerCall * config.callsPerDay;
       message += `\nAt ${config.callsPerDay.toLocaleString()} calls/day -> ~$${dailyCost.toFixed(2)}/day input.`;

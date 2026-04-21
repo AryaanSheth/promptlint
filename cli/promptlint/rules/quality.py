@@ -464,3 +464,51 @@ def check_hallucination_risk(text: str, config: PromptlintConfig) -> List[Dict[s
             }
         ]
     return []
+
+
+def check_politeness(text: str, config: PromptlintConfig) -> List[Dict[str, object]]:
+    results: List[Dict[str, object]] = []
+
+    if not config.enabled_rules.get("politeness-bloat", True):
+        return results
+
+    if not config.politeness_words:
+        return results
+
+    import re as _re
+    escaped_words = [_re.escape(word) for word in config.politeness_words]
+    bloat_regex = r"(?<!\w)(?:" + "|".join(escaped_words) + r")(?!\w)"
+    bloat_matches = list(_re.finditer(bloat_regex, text, _re.IGNORECASE))
+
+    if not bloat_matches:
+        return results
+
+    level = "INFO" if config.allow_politeness else "WARN"
+
+    for match in bloat_matches:
+        line = _line_number(text, match.start())
+        context = _line_context(text, match.start(), config.context_width)
+
+        if config.allow_politeness:
+            message = (
+                f"Optional: Remove '{match.group(0)}' to save "
+                f"~{config.politeness_savings_per_hit} tokens."
+            )
+        else:
+            message = (
+                f"Consider removing '{match.group(0)}' "
+                f"(adds {config.politeness_savings_per_hit} tokens without semantic value)."
+            )
+
+        results.append(
+            {
+                "level": level,
+                "rule": "politeness-bloat",
+                "message": message,
+                "savings": config.politeness_savings_per_hit,
+                "line": line,
+                "context": context,
+            }
+        )
+
+    return results

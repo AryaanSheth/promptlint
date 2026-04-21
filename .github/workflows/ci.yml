@@ -22,11 +22,90 @@ jobs:
         working-directory: cli
         run: |
           pip install -e ".[dev]" || pip install -e .
+          pip install pytest pytest-cov mypy bandit hypothesis
+
+      - name: Type-check (mypy)
+        working-directory: cli
+        run: mypy promptlint/ --ignore-missing-imports
+
+      - name: Security scan (bandit)
+        working-directory: cli
+        run: bandit -r promptlint/ -ll -q
+
+      - name: Run tests with coverage
+        working-directory: cli
+        run: pytest tests/ -v --cov=promptlint --cov-report=term-missing --cov-fail-under=80
+
+  parity:
+    name: Rule parity check
+    runs-on: ubuntu-latest
+    needs: [python, npm]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Python CLI
+        working-directory: cli
+        run: pip install -e .
+
+      - name: Build npm engine
+        working-directory: npm
+        run: npm install && npm run build
+
+      - name: Validate Python registry matches manifest
+        working-directory: cli
+        run: python -m pytest tests/test_parity.py -v
+
+      - name: Validate TypeScript RULE_IDS matches manifest
+        run: |
+          node - << 'EOF'
+          const manifest = require('./rules-manifest.json').rules;
+          const engine  = require('./npm/dist/engine.js');
+          const tsIds   = [...engine.RULE_IDS].sort();
+          const mfIds   = [...manifest].sort();
+          const missing = mfIds.filter(id => !tsIds.includes(id));
+          const extra   = tsIds.filter(id => !mfIds.includes(id));
+          if (missing.length) {
+            console.error('Rules in manifest but missing from TypeScript engine:', missing);
+            process.exit(1);
+          }
+          if (extra.length) {
+            console.error('Rules in TypeScript engine but missing from manifest:', extra);
+            process.exit(1);
+          }
+          console.log(`Parity OK — ${tsIds.length} rules in sync.`);
+          EOF
+
+  benchmarks:
+    name: Performance benchmarks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        working-directory: cli
+        run: |
+          pip install -e ".[dev]" || pip install -e .
           pip install pytest
 
-      - name: Run tests
+      - name: Run benchmark tests
         working-directory: cli
-        run: pytest tests/ -v
+        run: pytest tests/test_performance.py -m slow -v
 
   npm:
     name: npm package
@@ -43,6 +122,10 @@ jobs:
         working-directory: npm
         run: npm install
 
+      - name: Lint (eslint)
+        working-directory: npm
+        run: npm run lint
+
       - name: Build and typecheck
         working-directory: npm
         run: npm run build
@@ -50,6 +133,7 @@ jobs:
   vscode:
     name: VS Code extension
     runs-on: ubuntu-latest
+    needs: npm
     steps:
       - uses: actions/checkout@v4
 
@@ -110,7 +194,7 @@ jobs:
   publish-pypi:
     name: Publish to PyPI
     runs-on: ubuntu-latest
-    needs: python
+    needs: [python, parity]
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
@@ -135,7 +219,7 @@ jobs:
   publish-npm:
     name: Publish to npm
     runs-on: ubuntu-latest
-    needs: npm
+    needs: [npm, parity]
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4

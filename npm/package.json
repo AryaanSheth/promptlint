@@ -45,6 +45,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "lint": "eslint src/ --ext .ts",
     "prepublishOnly": "npm run build",
     "dev": "tsc --watch"
   },
@@ -54,6 +55,9 @@
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
     "typescript": "^5.4.0"
   }
 }

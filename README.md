@@ -299,6 +299,57 @@ docs/           Full reference documentation
 
 ---
 
+### Troubleshooting
+
+**Token counts differ between the Python and npm CLIs**
+
+The Python CLI uses [tiktoken](https://github.com/openai/tiktoken) for exact token counts. The npm CLI uses a `chars / 4` heuristic (±15%). If precise counts matter — for cost budgeting or strict `token_limit` enforcement — use the Python CLI.
+
+**`pip install promptlint-cli` succeeds but token counts are wrong**
+
+tiktoken is an optional dependency. Install it explicitly:
+```bash
+pip install "promptlint-cli[tiktoken]"
+```
+Without it, the Python CLI falls back to the same chars/4 heuristic as npm.
+
+**`promptlint --fix` removes too much text**
+
+Auto-fix is conservative by design, but edge cases exist. Always review the diff before committing a fixed prompt. You can disable individual fix rules in `.promptlintrc`:
+```yaml
+fix:
+  politeness_bloat: false   # keep but don't auto-remove polite phrasing
+```
+
+**False positives on injection detection**
+
+The normalizer aggressively collapses leetspeak and unicode, which can occasionally flag non-injection text (e.g., `$100 price` or leetspeak usernames). Suppress per-line with:
+```
+Your $100 budget  # promptlint-disable prompt-injection
+```
+Or tighten the pattern list in `.promptlintrc`:
+```yaml
+rules:
+  prompt_injection:
+    patterns:
+      - ignore previous instructions   # only patterns you actually care about
+```
+
+**Config file not picked up**
+
+PromptLint looks for `.promptlintrc` in the current working directory, not the file's directory. Run from your repo root or pass `--config path/to/.promptlintrc` explicitly.
+
+**SARIF output rejected by GitHub Security tab**
+
+SARIF upload requires `security-events: write` permission. Add it to your workflow:
+```yaml
+permissions:
+  contents: read
+  security-events: write
+```
+
+---
+
 ### Security
 
 - All analysis is local. Nothing leaves your machine.
