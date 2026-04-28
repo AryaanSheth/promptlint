@@ -34,7 +34,7 @@ dependencies = [
 
 [project.optional-dependencies]
 tiktoken = ["tiktoken~=0.5"]
-dev = ["pytest", "pytest-cov", "hypothesis"]
+dev = ["pytest", "pytest-cov", "hypothesis", "types-PyYAML"]
 
 [project.urls]
 Homepage = "https://github.com/AryaanSheth/promptlint"

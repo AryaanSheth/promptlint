@@ -8,6 +8,7 @@ const LEET_MAP: Record<string, string> = {
   "(": "c", "|": "l", "+": "t",
 };
 
+// eslint-disable-next-line no-misleading-character-class
 const ZERO_WIDTH = /[\u200b\u200c\u200d\u2060\ufeff\u00ad\u034f\u180e]/g;
 
 function normalizeForMatching(text: string): string {

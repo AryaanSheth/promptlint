@@ -20,7 +20,7 @@ export function lineContext(text: string, index: number, width: number): string 
   if (line.length > width) {
     const half = Math.floor(width / 2);
     let left = Math.max(column - half, 0);
-    let right = Math.min(left + width, line.length);
+    const right = Math.min(left + width, line.length);
     if (right - left < width) left = Math.max(right - width, 0);
     const trimmed = line.slice(left, right);
     caretPos = column - left;
