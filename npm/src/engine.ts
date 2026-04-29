@@ -1,5 +1,5 @@
 import type { PromptlintConfig } from "./config";
-import { checkTokens, countTokens } from "./rules/cost";
+import { checkTokens } from "./rules/cost";
 import type { Finding } from "./rules/cost";
 import {
   checkInjection,

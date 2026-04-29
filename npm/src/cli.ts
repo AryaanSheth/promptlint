@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import * as fs from "fs";
 import * as path from "path";
-import * as readline from "readline";
 import { loadConfig, STARTER_CONFIG } from "./config";
 import { analyze, applyFixes } from "./engine";
 import type { Finding } from "./rules/cost";

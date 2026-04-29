@@ -1,0 +1,162 @@
+/* PromptLint custom theme */
+
+:root {
+  --vp-c-brand-1: #6366f1;
+  --vp-c-brand-2: #4f46e5;
+  --vp-c-brand-3: #4338ca;
+  --vp-c-brand-soft: rgba(99, 102, 241, 0.14);
+
+  --vp-button-brand-border: transparent;
+  --vp-button-brand-text: #fff;
+  --vp-button-brand-bg: var(--vp-c-brand-1);
+  --vp-button-brand-hover-border: transparent;
+  --vp-button-brand-hover-text: #fff;
+  --vp-button-brand-hover-bg: var(--vp-c-brand-2);
+  --vp-button-brand-active-border: transparent;
+  --vp-button-brand-active-text: #fff;
+  --vp-button-brand-active-bg: var(--vp-c-brand-3);
+}
+
+.dark {
+  --vp-c-brand-1: #818cf8;
+  --vp-c-brand-2: #6366f1;
+  --vp-c-brand-3: #4f46e5;
+  --vp-c-brand-soft: rgba(129, 140, 248, 0.14);
+}
+
+/* ── Home hero ── */
+.VPHero .text {
+  background: linear-gradient(135deg, #6366f1 0%, #a78bfa 50%, #f472b6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Feature cards ── */
+.VPFeature {
+  border-radius: 12px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.VPFeature:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(99, 102, 241, 0.15);
+}
+
+/* ── Badges / severity labels ── */
+.severity-critical {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.severity-warn {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.severity-info {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+/* ── Rule detail blocks ── */
+.rule-meta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 16px 0 24px;
+}
+
+.rule-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--vp-c-text-2);
+}
+
+/* ── Terminal-style output blocks ── */
+.vp-doc .terminal {
+  background: #0d1117;
+  border-radius: 8px;
+  padding: 20px;
+  font-family: var(--vp-font-family-mono);
+  font-size: 0.875rem;
+  line-height: 1.7;
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.vp-doc .terminal .critical { color: #f87171; font-weight: bold; }
+.vp-doc .terminal .warn     { color: #fbbf24; font-weight: bold; }
+.vp-doc .terminal .info     { color: #60a5fa; }
+.vp-doc .terminal .success  { color: #34d399; }
+.vp-doc .terminal .dim      { color: #6b7280; }
+
+/* ── Home page action buttons ── */
+.VPHomeHero .actions .VPButton.medium.brand {
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  border-color: transparent;
+  font-weight: 600;
+}
+
+/* ── Nav logo text ── */
+.VPNavBarTitle .title {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* ── Sidebar ── */
+.VPSidebarItem.is-active > .item .text {
+  color: var(--vp-c-brand-1);
+  font-weight: 600;
+}
+
+/* ── Code groups ── */
+.vp-code-group .tabs {
+  border-radius: 8px 8px 0 0;
+}
+
+/* ── Custom containers ── */
+.vp-doc .tip,
+.vp-doc .warning,
+.vp-doc .danger {
+  border-radius: 8px;
+}
+
+/* ── Rule overview table ── */
+.rules-table th {
+  background: var(--vp-c-bg-soft);
+}
+
+.rules-table td:nth-child(2) {
+  font-family: var(--vp-font-family-mono);
+  font-size: 0.85rem;
+}
+
+/* ── Anchor links ── */
+.vp-doc h2 .header-anchor,
+.vp-doc h3 .header-anchor {
+  color: var(--vp-c-brand-1);
+}
