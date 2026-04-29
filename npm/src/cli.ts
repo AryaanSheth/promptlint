@@ -210,6 +210,7 @@ function cmdInit(): void {
   }
   fs.writeFileSync(dest, STARTER_CONFIG, "utf8");
   console.log(green("Created .promptlintrc") + " with default settings.");
+  console.log(dim("→") + " Example configs for common use cases: " + cyan("https://docs.promptlint.dev/guide/config-examples"));
 }
 
 // ── Inline-disable support ───────────────────────────────────────────────
