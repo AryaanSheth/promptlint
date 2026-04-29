@@ -4,48 +4,52 @@
 
 ## What It Does
 
-Fires when the prompt has no examples (few-shot demonstrations). Adding even one or two examples is the highest-ROI prompt improvement for output consistency.
+Detects prompts that contain a creative/generative instruction but provide no examples of the expected output. Few-shot examples are the highest-ROI prompt improvement for output consistency on generation tasks.
 
-## Example
+## Trigger Conditions
 
-**Prompt without examples:**
+::: warning Three conditions must all be true
+1. The prompt is **longer than 100 characters**
+2. The prompt contains at least one **generative instruction verb**: `write`, `create`, `generate`, `build`, `implement`, `design`
+3. The prompt does **not** contain an **example indicator**: `example`, `e.g.`, `such as`, `like`, `for instance`
+:::
+
+This is a heuristic, not structural detection. The rule doesn't parse for `<examples>` sections — it looks for the keyword `example` (or synonyms) anywhere in the prompt text.
+
+## Examples
+
+::: danger Triggers the rule
 ```
-<task>Extract the sentiment and key topic from the review.</task>
-<output_format>JSON with "sentiment" and "topic" keys.</output_format>
+Write a Python function that validates email addresses and returns a
+tuple of (is_valid: bool, error_message: str).
 ```
+Contains `write` (generative verb), no `example` keyword, > 100 chars.
 
-**Finding:**
 ```
 [ INFO ] specificity-examples (line -)
-  No examples provided. Adding 1-2 input/output pairs significantly
-  improves output consistency and format adherence.
+  Consider adding examples to clarify expected output format.
 ```
+:::
 
-## How to Add Examples
-
+::: tip Passes the rule
 ```
-<task>Extract the sentiment and key topic from the review.</task>
+Write a Python function that validates email addresses.
 
-<examples>
-Input: "The product arrived quickly but the packaging was damaged."
-Output: {"sentiment": "mixed", "topic": "shipping and packaging"}
-
-Input: "Absolutely love this! Works perfectly and great value."
-Output: {"sentiment": "positive", "topic": "product quality and value"}
-</examples>
-
-<input>{{REVIEW_TEXT}}</input>
-<output_format>JSON with "sentiment" and "topic" keys.</output_format>
+Examples:
+  validate("user@example.com")  → (True, "")
+  validate("not-an-email")      → (False, "missing @ symbol")
+  validate("")                  → (False, "empty input")
 ```
+Contains `examples` → no finding.
+:::
 
-## What Counts as Examples
+## False Positives
 
-The rule looks for:
-- `<examples>` or `<example>` XML tags
-- `Example:` or `Examples:` headings
-- `Input:` / `Output:` pairs
-- `Q:` / `A:` pairs
-- Numbered examples (`1.`, `2.`)
+**Prompts about writing style** — "Write a formal email" is short and won't fire (< 100 chars usually). "Write a comprehensive formal business email for a client who has missed two invoice payments" is > 100 chars, has `write`, and will fire. Whether you need examples here is debatable.
+
+**`like` as a non-example word** — "Generate output like JSON but simpler" contains `like`, so it suppresses the rule even though no actual examples are given. This is intentional — the word `like` signals an informal comparison that serves a similar purpose.
+
+**`design` in non-generative context** — "What are the design principles of REST APIs?" contains `design` but it's a question, not a generation task. The rule will still fire because it looks for the keyword, not the grammatical role. The false-positive rate for this verb is higher than for `write` or `generate`.
 
 ## Configuration
 
@@ -53,13 +57,47 @@ The rule looks for:
 rules:
   specificity_examples: true
 
-# Promote to WARN level:
+# Promote to WARN for stricter enforcement:
 rules:
   specificity_examples:
     enabled: true
     level: warn
 ```
 
-## Why It Matters
+Disable:
+```yaml
+rules:
+  specificity_examples: false
+```
 
-Zero-shot vs. few-shot can be a 20–40% quality difference on classification and extraction tasks. The cost is a few extra tokens per call — almost always worth it.
+## When to Add Examples
+
+Examples have the biggest impact when:
+- The output **format** needs to be precise (JSON schema, specific string pattern)
+- The output **style** needs to be consistent (tone, vocabulary, length)
+- The task involves **classification or extraction** where label choices matter
+
+Diminishing returns when:
+- The task is a one-off generation (brainstorming, creative writing)
+- The model's default behavior for that task already matches your needs
+- Adding examples would consume too many tokens relative to the benefit
+
+## How to Add Effective Examples
+
+```
+<task>Extract action items and owners from meeting notes.</task>
+
+<examples>
+Input: "Sarah will follow up with the vendor by EOW"
+Output: {"action": "follow up with vendor", "owner": "Sarah", "due": "end of week"}
+
+Input: "John to schedule quarterly review next month"
+Output: {"action": "schedule quarterly review", "owner": "John", "due": "next month"}
+
+Input: "No action items"
+Output: []
+</examples>
+
+<input>{{MEETING_NOTES}}</input>
+<output_format>JSON array. Return [] if no action items found.</output_format>
+```

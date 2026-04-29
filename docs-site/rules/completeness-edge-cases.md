@@ -4,65 +4,108 @@
 
 ## What It Does
 
-Fires when the prompt defines a task but provides no guidance on edge cases or failure modes. Prompts that only describe the happy path produce brittle behavior on boundary inputs.
+Fires when a prompt contains a task verb but provides no guidance on error or edge-case handling. Prompts that only describe the happy path produce brittle behavior on unexpected inputs.
 
-## Example
+## Trigger Conditions
 
-::: danger No edge cases
+All three must be true:
+
+1. **Task verb present** — the prompt contains `write`, `create`, `implement`, `build`, or `generate`
+2. **No edge-case keywords** — none of: `edge case`, `error`, `exception`, `invalid`, `empty`, `null`, `missing`
+3. **Prompt is more than 100 characters**
+
+One finding is emitted for the whole prompt (line `-`).
+
+::: tip Keyword-based detection
+The rule matches any occurrence of the keyword anywhere in the prompt text. "Return null on empty input" contains `null` and `empty`, so it suppresses the finding. You don't need a dedicated `<edge_cases>` section — as long as one of the suppression keywords appears, the rule is satisfied.
+:::
+
+## Examples
+
+::: danger No edge-case coverage
 ```
-<task>Parse the user's date of birth from the input string.</task>
-<output_format>Return as ISO 8601 string (YYYY-MM-DD).</output_format>
+Write a function that parses a date string and returns an ISO 8601 date.
+The input will be in MM/DD/YYYY format. Return the formatted date.
 ```
 
 Finding:
 ```
 [ INFO ] completeness-edge-cases (line -)
-  No edge cases defined. Consider specifying behavior for:
-  invalid input, empty input, ambiguous values, boundary conditions.
+  Consider specifying how to handle edge cases and errors.
 ```
 :::
 
-::: tip With edge cases
+::: tip With edge-case coverage — inline keyword suppresses the rule
 ```
-<task>Parse the user's date of birth from the input string.</task>
-<edge_cases>
-- If the input is empty or null, return null
-- If the date is ambiguous (e.g., "01/02/03"), prefer DD/MM/YY format
-- If the year is two digits (e.g., "85"), assume 1900s if > 25, else 2000s
-- If parsing fails entirely, return {"error": "unparseable_date", "input": <original>}
-</edge_cases>
-<output_format>Return ISO 8601 string (YYYY-MM-DD) or null or error object.</output_format>
+Write a function that parses a date string and returns an ISO 8601 date.
+The input will be in MM/DD/YYYY format.
+Return null if the input is empty or invalid.
+Raise a ValueError if the format cannot be parsed.
 ```
+*(Contains `null`, `empty`, `invalid`, `error` → rule does not fire)*
 :::
 
-## What Counts as Edge Case Coverage
+::: tip With explicit edge-case section
+```
+Write a function that parses a date string and returns an ISO 8601 date.
+The input will be in MM/DD/YYYY format.
 
-The rule looks for:
-- `<edge_cases>` or `<error_handling>` XML tag
-- `Edge cases:`, `Error handling:`, `Failure modes:` headings
-- Lines containing `if ... empty`, `if ... null`, `if ... invalid`, `if ... fails`
-- `otherwise`, `fallback`, `on error`
+Edge cases:
+- Empty string → return None
+- Invalid format → raise ValueError with the original input
+- Two-digit year → treat as 2000s if ≤ 25, else 1900s
+- Null input → raise TypeError
+```
+*(Contains `edge case`, `empty`, `invalid`, `null` → rule does not fire)*
+:::
+
+## Common Edge Cases to Address
+
+For **parsing tasks:**
+- Empty or null input
+- Malformed or unexpected format
+- Boundary values (min/max length, date ranges, number limits)
+- Encoding issues (non-ASCII, BOM characters)
+
+For **transformation tasks:**
+- Input with missing required fields
+- Input with extra/unknown fields
+- Type mismatches
+
+For **generation tasks:**
+- What to do when there is not enough context
+- Fallback format if the preferred format cannot be produced
+- Maximum output length behavior
+
+For **retrieval/lookup tasks:**
+- Not found — return null, empty list, or raise an error?
+- Multiple matches — return all, return first, or raise?
+- Partial match — return closest or nothing?
+
+## False Positives
+
+**Short prompts** — the 100-character threshold prevents the rule from firing on terse one-liners like "Write a haiku about autumn." which genuinely don't need edge-case guidance.
+
+**Creative/open-ended prompts** — "Create a story about a detective" doesn't benefit from null/empty handling. Disable the rule for creative writing prompts:
+
+```yaml
+rules:
+  completeness_edge_cases: false
+```
+
+**The keyword appears in a different context** — "Generate an error message for the user" contains `error`, which suppresses the rule even though no edge cases are defined. This is a known limitation of keyword-based detection.
 
 ## Configuration
 
 ```yaml
 rules:
-  completeness_edge_cases: true
-
-# Promote to WARN for stricter enforcement:
-rules:
-  completeness_edge_cases:
-    enabled: true
-    level: warn
+  completeness_edge_cases: true   # default: true
 ```
 
-## Why It Matters
+Disable:
+```yaml
+rules:
+  completeness_edge_cases: false
+```
 
-The happy path is easy. Production prompts handle:
-- Empty or null input
-- Malformed data
-- Ambiguous values
-- Rate limits or timeouts (if the prompt controls retry logic)
-- Missing fields
-
-Define these explicitly and your model's behavior becomes predictable.
+The severity is fixed at INFO and cannot be promoted via config — use `--fail-level info` to make it block CI.

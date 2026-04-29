@@ -4,40 +4,53 @@
 
 ## What It Does
 
-Fires when the prompt has no negative constraints — no "do not", "avoid", "must not", or `<constraints>` section. Models need to know what **not** to do as much as what to do.
+Detects prompts that contain a task instruction but no constraint keywords. Without constraints — "do not", "must", "limit", "exactly" — the model makes its own choices about scope, format, and edge case handling.
 
-## Example
+## Trigger Conditions
 
-**Prompt without constraints:**
+::: warning Three conditions must all be true
+1. The prompt is **longer than 80 characters**
+2. The prompt contains a **task verb**: `write`, `create`, `generate`, `list`, `explain`
+3. The prompt does **not** contain a **constraint keyword**: `must`, `should`, `limit`, `maximum`, `minimum`, `between`, `exactly`, `only`
+:::
+
+This is keyword-based heuristic detection. The rule doesn't understand whether your constraints are semantically sufficient — it just checks if constraint vocabulary is present.
+
+## Examples
+
+::: danger Triggers the rule
 ```
-<task>Write a Python function to parse JSON from a string.</task>
-<output_format>Python code.</output_format>
+Write a Python function that parses configuration files and returns
+a dictionary of the settings with their values.
 ```
+Has `write` (task verb), > 80 chars, no constraint keywords.
 
-**Finding:**
 ```
 [ INFO ] specificity-constraints (line -)
-  No constraints defined. Consider adding a <constraints> section
-  specifying what the model should NOT do (e.g., "Do not use third-party libraries").
+  Consider adding constraints (length, format, scope) for clearer results.
 ```
+:::
 
-**With constraints:**
+::: tip Passes the rule
 ```
-<task>Write a Python function to parse JSON from a string.</task>
-<constraints>
-- Use only the standard library (no third-party packages)
-- Do not add docstrings or comments
-- Do not print anything to stdout
-- Return None on parse failure (do not raise exceptions)
-</constraints>
-<output_format>Python code only. No explanation.</output_format>
+Write a Python function that parses configuration files and returns
+a dictionary of the settings.
+Constraints:
+- Must use only the standard library (no third-party packages)
+- Should handle missing files gracefully (return empty dict, not raise)
+- Maximum 30 lines of code
+- Only support INI and JSON formats
 ```
+Has `must`, `should`, `maximum`, `only` → no finding.
+:::
 
-## What Counts as Constraints
+## False Positives
 
-- `<constraints>` or `<restrictions>` XML tag
-- `Constraints:`, `Restrictions:`, `Do not:` headings
-- Lines containing `do not`, `don't`, `must not`, `avoid`, `never`
+**Prompts with implicit constraints via examples** — "Write a function. Example: `validate("a@b.c") → True`" has implicit format constraints from the example, but the rule still fires because no constraint keyword is present. This is intentional — explicit constraints are clearer.
+
+**`should` in non-constraint context** — "Write a greeting that should feel warm" contains `should`, so the rule is suppressed even though there aren't meaningful constraints. The heuristic isn't semantically aware.
+
+**Short prompts** — "Write a haiku about autumn" is < 80 chars and won't fire even though it has no constraints. The rule targets longer, more complex prompts where unconstrained generation is riskier.
 
 ## Configuration
 
@@ -52,12 +65,33 @@ rules:
     level: warn
 ```
 
-## Why It Matters
+Disable:
+```yaml
+rules:
+  specificity_constraints: false
+```
 
-Without constraints, models make reasonable-sounding but wrong choices:
-- Add explanatory prose when you wanted code only
-- Use a library you don't have installed
-- Return null instead of an empty list
-- Print debug output to stdout
+## What Makes a Good Constraint
 
-Constraints are the cheapest way to prevent the most common failure modes.
+Effective constraints are **negative and boundary-defining**, not just positive instructions:
+
+| Type | Example |
+|------|---------|
+| Scope limit | "Only extract from the provided text — do not use outside knowledge" |
+| Format boundary | "Return JSON only — no prose before or after" |
+| Length constraint | "Maximum 3 bullet points" |
+| Library constraint | "Use only the standard library" |
+| Error behavior | "Return null on failure — do not raise exceptions" |
+| Exclusion | "Do not include PII in the output" |
+
+A useful mental model: **what would you be annoyed to see the model do?** Each of those is a constraint.
+
+```
+<constraints>
+- Do not add docstrings or inline comments
+- Do not use f-strings — use .format() for compatibility
+- Do not print to stdout
+- Return None (not False, not "") when the input is empty
+- Maximum 25 lines
+</constraints>
+```

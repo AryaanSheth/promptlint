@@ -4,55 +4,73 @@
 
 ## What It Does
 
-Detects vague, ambiguous terms that reduce output quality. Words like "good", "efficient", "things", "various", and "proper" force the model to guess your intent.
+Detects vague quantifiers and catch-all expressions that leave the model guessing at your intent. These are words that introduce ambiguity about *how many*, *how much*, or *in what way* something should be done.
 
-## Example
+::: warning Scope caveat
+This rule targets **quantifier and manner vagueness**, not general quality descriptors. It detects words like `several`, `various`, `somehow` — not words like `good`, `efficient`, or `proper`. Those require human judgment to define; this rule catches only patterns where a number, enumeration, or concrete description is objectively better.
+:::
 
-::: danger Vague
+## Detected Patterns
+
+| Pattern | Category | Why it's flagged |
+|---------|----------|-----------------|
+| `some`, `several`, `various`, `many`, `few` | Vague quantifier | Specify a number or range instead |
+| `stuff`, `things`, `etc`, `and so on`, `and more` | Trailing catch-all | Enumerate the specific items |
+| `somehow`, `somewhere`, `sometime` | Unspecified manner/place/time | Be concrete about how, where, or when |
+| `maybe` | Uncertain instruction | Instructions should be definitive |
+
+::: tip Note on `maybe`
+`maybe` is only flagged when used as an instruction hedge (e.g., "maybe add error handling"). It won't flag "maybe null" or "maybe undefined" — those are legitimate programming terms.
+:::
+
+## Examples
+
+::: danger Triggers the rule
 ```
-Write a good function that efficiently handles various edge cases properly.
+Process several files and return things in some format.
+The function should somehow handle edge cases and so on.
+Maybe add logging if possible.
 ```
 
 Findings:
 ```
 [ WARN ] clarity-vague-terms (line 1)
-  Vague term: 'good' — specify what "good" means (e.g., "readable", "tested", "O(n log n)")
-
+  Vague quantifier: 'several' — specify a number or range
 [ WARN ] clarity-vague-terms (line 1)
-  Vague term: 'efficiently' — specify performance requirements
-
+  Trailing catch-all: 'things' — enumerate explicitly
 [ WARN ] clarity-vague-terms (line 1)
-  Vague term: 'various' — enumerate the specific cases
-
-[ WARN ] clarity-vague-terms (line 1)
-  Vague term: 'properly' — define what proper handling looks like
+  Vague quantifier: 'some' — specify a number or range
+[ WARN ] clarity-vague-terms (line 2)
+  Unspecified manner: 'somehow' — be concrete about how
+[ WARN ] clarity-vague-terms (line 2)
+  Trailing catch-all: 'and so on' — enumerate explicitly
+[ WARN ] clarity-vague-terms (line 3)
+  Uncertain language: 'maybe' — use a definitive instruction
 ```
 :::
 
-::: tip Specific
+::: tip Clean version
 ```
-Write a function that:
-- Is O(n log n) time complexity
-- Handles empty input, None, and lists > 10,000 elements
-- Returns an empty list (not None) on empty input
-- Raises ValueError (not crashes) on invalid types
+Process up to 50 files and return results as a JSON array.
+The function must catch ValueError and TypeError — log both with stack traces.
+Add structured logging using the stdlib `logging` module.
 ```
 :::
 
-## Detected Vague Terms
+## What This Rule Does NOT Catch
 
-| Term | Better alternatives |
-|------|-------------------|
-| `good` | "readable", "tested", "O(n)", "under 30 lines" |
-| `efficient` | "O(n log n)", "< 100ms", "memory-efficient" |
-| `things` | Name the actual things |
-| `various` | "the following: A, B, C" |
-| `proper` | Define what proper means |
-| `appropriate` | Be specific |
-| `nice` | Define the quality |
-| `handle` | "return X", "raise Y", "log Z" |
-| `deal with` | Specify the handling |
-| `etc.` | Enumerate completely |
+This rule is intentionally narrow. It won't flag:
+- Subjective quality words: `good`, `clean`, `efficient`, `proper`, `nice`
+- Ambiguous verbs: `handle`, `deal with`, `manage`
+- Vague adjectives: `appropriate`, `reasonable`, `relevant`
+
+For these, use [`clarity-vague-terms`](/rules/clarity-vague-terms) together with [`specificity-examples`](/rules/specificity-examples) and [`specificity-constraints`](/rules/specificity-constraints) — together they cover a broader range of underspecification.
+
+## False Positives
+
+**"few-shot"** — the word `few` in "few-shot examples" will trigger the rule. Disable the rule or add an inline comment if your prompt engineering terminology triggers false positives.
+
+**Legitimate "etc."** — if you genuinely want to say "supports formats X, Y, etc." where the remaining formats are well-understood by context, this will still trigger. Consider being explicit anyway — the model will produce better output.
 
 ## Configuration
 
@@ -61,6 +79,10 @@ rules:
   clarity_vague_terms: true  # or false to disable
 ```
 
-## No Auto-Fix
-
-Replacing vague terms requires understanding your intent — PromptLint reports them but you fix them. Use the findings as a review checklist.
+Severity can be demoted:
+```yaml
+rules:
+  clarity_vague_terms:
+    enabled: true
+    level: info
+```

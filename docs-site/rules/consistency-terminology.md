@@ -4,52 +4,106 @@
 
 ## What It Does
 
-Detects when the same concept is referred to by multiple different names within the same prompt. Inconsistent terminology confuses the model about whether these refer to the same thing or different things.
+Detects when the same concept is referred to by two different names within the same prompt. When both terms from a known synonym pair appear together, the model may treat them as distinct entities — causing duplicated logic or ignored instructions.
 
-## Example
+One finding is emitted per conflicting pair found.
 
-::: danger Inconsistent
+## Built-in Term Pairs
+
+The rule checks 12 built-in synonym pairs. A finding fires when **both** terms from a pair appear anywhere in the prompt:
+
+| Term A | Term B |
+|--------|--------|
+| `user` | `customer` |
+| `function` | `method` |
+| `error` | `exception` |
+| `AI` | `model` |
+| `LLM` | `model` |
+| `query` | `request` |
+| `response` | `reply` |
+| `output` | `result` |
+| `prompt` | `message` |
+| `system prompt` | `instruction` |
+| `task` | `goal` |
+| `agent` | `assistant` |
+
+::: warning Pair-based, not cluster-based
+The rule only compares terms within the same predefined pair. It will not flag "user" vs "client" or "person" vs "customer" — those aren't built-in pairs. Use `custom_term_pairs` to add your own.
+:::
+
+## Examples
+
+::: danger Mixed terminology
 ```
-Extract user records from the database.
-Each customer should have a name and email.
-Return the person's data as JSON.
-Users must have a valid account to appear in results.
+Extract all user records from the database.
+Each customer entry must include a name, email, and account status.
+Return the user list as JSON.
 ```
 
-Finding:
+Findings:
 ```
 [ INFO ] consistency-terminology (line -)
-  Inconsistent terminology: 'user', 'customer', 'person' may refer to the same entity.
-  Pick one term and use it consistently.
+  Mixed terminology: 'user' and 'customer'. Use one term consistently.
 ```
 :::
 
-::: tip Consistent
+::: tip Consistent terminology
 ```
-Extract user records from the database.
-Each user should have a name and email.
-Return the user's data as JSON.
-Users must have a valid account to appear in results.
+Extract all user records from the database.
+Each user entry must include a name, email, and account status.
+Return the user list as JSON.
 ```
 :::
 
-## Common Inconsistency Patterns
+::: danger Multiple conflicting pairs
+```
+Call the LLM to generate a response.
+The model will return a reply in under 200 tokens.
+```
 
-| Concept | Inconsistent variants |
-|---------|----------------------|
-| End user | "user", "customer", "client", "person", "member" |
-| API call | "request", "call", "invocation", "query" |
-| Response | "response", "result", "output", "return value" |
-| Error | "error", "exception", "failure", "issue", "problem" |
-| Config | "config", "configuration", "settings", "options", "params" |
+Findings:
+```
+[ INFO ] consistency-terminology (line -)
+  Mixed terminology: 'LLM' and 'model'. Use one term consistently.
+[ INFO ] consistency-terminology (line -)
+  Mixed terminology: 'response' and 'reply'. Use one term consistently.
+```
+:::
 
-## Configuration
+## Custom Term Groups
+
+Add project-specific synonym groups in `.promptlintrc`. Each group is a list of terms that should not be mixed — every pair within the group is checked:
 
 ```yaml
 rules:
-  consistency_terminology: true
+  consistency_terminology:
+    enabled: true
+    custom_term_pairs:
+      - ["config", "configuration", "settings"]    # flags config+settings, config+configuration, etc.
+      - ["endpoint", "route", "path"]
+      - ["payload", "body", "data"]
+```
+
+## False Positives
+
+**Intentional distinction** — "An AI model differs from a traditional rule-based model in…" uses both `AI` and `model` but refers to different things. The rule can't distinguish intent. Disable it or use `custom_term_pairs` with terms that are genuinely equivalent in your domain.
+
+**Technical writing conventions** — API documentation often uses `request` and `query` with distinct meanings (HTTP request vs. database query). In that context, the pair `query`/`request` may flag legitimately different concepts.
+
+## Configuration
+
+Enable/disable:
+```yaml
+rules:
+  consistency_terminology: true   # default: true
+```
+
+Disable:
+```yaml
+rules:
+  consistency_terminology: false
 ```
 
 ## No Auto-Fix
 
-Merging terminology requires knowing which term is canonical — PromptLint reports the ambiguity but you choose the term.
+Resolving a terminology conflict requires knowing which term is canonical — PromptLint reports the ambiguity but leaves the choice to you.
