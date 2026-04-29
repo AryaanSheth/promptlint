@@ -57,6 +57,7 @@ export default defineConfig({
         {
           text: 'Resources',
           items: [
+            { text: 'Config Examples', link: '/guide/config-examples' },
             { text: 'Best Practices', link: '/guide/best-practices' },
             { text: 'FAQ', link: '/guide/faq' },
           ],

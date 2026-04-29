@@ -372,6 +372,10 @@ def _cmd_init() -> None:
         sys.exit(1)
     dest.write_text(_STARTER_CONFIG, encoding="utf-8")
     console.print("[green]Created .promptlintrc[/green] with default settings.")
+    console.print(
+        "[dim]→[/dim] Example configs for common use cases: "
+        "[cyan]https://docs.promptlint.dev/guide/config-examples[/cyan]"
+    )
 
 
 # ── Argument parser ─────────────────────────────────────────────────────
