@@ -4,9 +4,14 @@ export default defineConfig({
   title: 'PromptLint',
   description: 'The static analysis tool for LLM prompts — catch cost waste, security risks, and quality issues before they reach production.',
 
+  appearance: 'force-dark',
+
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/logo.svg' }],
-    ['meta', { name: 'theme-color', content: '#6366f1' }],
+    ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
+    ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
+    ['link', { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap' }],
+    ['meta', { name: 'theme-color', content: '#00ff88' }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:locale', content: 'en' }],
     ['meta', { property: 'og:title', content: 'PromptLint — Lint your LLM prompts' }],
@@ -158,9 +163,9 @@ export default defineConfig({
 
   markdown: {
     theme: {
-      light: 'github-light',
-      dark: 'github-dark',
+      light: 'min-dark',
+      dark: 'min-dark',
     },
-    lineNumbers: true,
+    lineNumbers: false,
   },
 })
