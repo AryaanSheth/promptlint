@@ -159,7 +159,7 @@ def _load_baseline(path: Path) -> Set[str]:
         return set()
 
 
-def _save_baseline(path: Path, results: list) -> None:
+def _save_baseline(path: Path, results: List[dict]) -> None:
     fps = sorted({_fingerprint(r) for r in results})
     path.write_text(
         json.dumps({"version": 1, "fingerprints": fps, "count": len(fps)}, indent=2),
@@ -167,7 +167,7 @@ def _save_baseline(path: Path, results: list) -> None:
     )
 
 
-def _filter_baseline(results: list, baseline: Set[str]) -> list:
+def _filter_baseline(results: List[dict], baseline: Set[str]) -> List[dict]:
     return [r for r in results if _fingerprint(r) not in baseline]
 
 
