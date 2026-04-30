@@ -2,7 +2,7 @@
   "name": "promptlint-vscode",
   "displayName": "PromptLint",
   "description": "VS Code extension that runs the promptlint CLI to provide diagnostics and fixes for LLM prompts.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "PromptLint",
   "license": "Apache-2.0",
   "repository": {

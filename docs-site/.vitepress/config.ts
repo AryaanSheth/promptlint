@@ -15,7 +15,7 @@ export default defineConfig({
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:locale', content: 'en' }],
     ['meta', { property: 'og:title', content: 'PromptLint — Lint your LLM prompts' }],
-    ['meta', { property: 'og:description', content: 'Catch cost waste, security risks, PII leaks, and quality issues in your AI prompts before they reach production. 20 rules, 5 auto-fixes, zero API calls.' }],
+    ['meta', { property: 'og:description', content: 'Catch cost waste, security risks, PII leaks, and quality issues in your AI prompts before they reach production. 21 rules, 5 auto-fixes, zero API calls.' }],
     ['meta', { property: 'og:site_name', content: 'PromptLint Docs' }],
   ],
 

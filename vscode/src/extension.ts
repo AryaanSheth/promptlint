@@ -43,9 +43,17 @@ function resolveConfigPath(configPath: string, docFsPath: string): string | unde
 
 const RULE_DOCS: Record<string, string> = {
   "cost": "Reports token count and estimated cost per call for your prompt.",
-  "cost-limit": "Warns when your prompt exceeds the configured token limit.",
+  "cost-limit": "Fires CRITICAL when your prompt exceeds the configured token limit.",
   "prompt-injection": "Detects prompt injection patterns that could override your instructions.",
+  "jailbreak-pattern": "Detects jailbreak attempts such as DAN mode, persona hijacking, and roleplay overrides.",
+  "secret-in-prompt": "Detects hardcoded API keys, passwords, connection strings, and tokens.",
+  "pii-in-prompt": "Detects personally identifiable information: emails, phone numbers, SSNs, credit cards.",
+  "context-injection-boundary": "Fires when user-injected content (template variables) lacks a trust boundary marker.",
   "structure-sections": "Checks for required structural tags (e.g. <task>, <context>).",
+  "role-clarity": "Fires when no role or persona is defined for the model.",
+  "output-format-missing": "Fires when no output format specification is present.",
+  "output-length-missing": "Fires when a task verb is present but no output length constraint is specified.",
+  "hallucination-risk": "Detects patterns that increase hallucination likelihood (factual claims without grounding).",
   "clarity-vague-terms": "Flags vague language that reduces precision (e.g. 'something', 'somehow').",
   "specificity-examples": "Suggests adding examples when none are present in longer prompts.",
   "specificity-constraints": "Checks for explicit output constraints (format, length, etc.).",
@@ -67,33 +75,34 @@ display:
   context_width: 80
 
 rules:
-  cost:
+  cost: true
+  cost_limit: true
+  prompt_injection: true
+  jailbreak_pattern: true
+  secret_in_prompt: true
+  pii_in_prompt:
     enabled: true
-  cost_limit:
-    enabled: true
-  prompt_injection:
-    enabled: true
-  structure_sections:
-    enabled: true
-  clarity_vague_terms:
-    enabled: true
-  specificity_examples:
-    enabled: true
-  specificity_constraints:
-    enabled: true
+    check_email: true
+    check_phone: true
+    check_ssn: true
+    check_credit_card: true
+  context_injection_boundary: true
+  structure_sections: true
+  role_clarity: true
+  output_format_missing: true
+  output_length_missing: true
+  hallucination_risk: true
+  clarity_vague_terms: true
+  specificity_examples: true
+  specificity_constraints: true
   politeness_bloat:
     enabled: true
     allow_politeness: false
-  verbosity_sentence_length:
-    enabled: true
-  verbosity_redundancy:
-    enabled: true
-  actionability_weak_verbs:
-    enabled: true
-  consistency_terminology:
-    enabled: true
-  completeness_edge_cases:
-    enabled: true
+  verbosity_sentence_length: true
+  verbosity_redundancy: true
+  actionability_weak_verbs: true
+  consistency_terminology: true
+  completeness_edge_cases: true
 
 fix:
   enabled: true

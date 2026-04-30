@@ -7,7 +7,7 @@ import { loadConfig, STARTER_CONFIG } from "./config";
 import { analyze, applyFixes, computeScore } from "./engine";
 import type { Finding } from "./rules/cost";
 
-const VERSION = "1.0.0";
+const VERSION = "1.4.0";
 const MAX_INPUT_BYTES = 10 * 1024 * 1024; // 10 MB
 
 // ── ANSI color helpers ───────────────────────────────────────────────────
