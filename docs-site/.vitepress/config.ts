@@ -28,7 +28,7 @@ export default defineConfig({
       { text: 'Reference', link: '/reference/cli', activeMatch: '/reference/' },
       { text: 'Integrations', link: '/integrations/github-actions', activeMatch: '/integrations/' },
       {
-        text: 'v1.3.0',
+        text: 'v1.4.0',
         items: [
           { text: 'Changelog', link: '/changelog' },
           { text: 'Contributing', link: 'https://github.com/AryaanSheth/promptlint/blob/main/CONTRIBUTING.md' },
