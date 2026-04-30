@@ -57,7 +57,7 @@ promptlint --file prompt.txt
 You should see output like this:
 
 ```
-  PromptLint v1.3.0
+  PromptLint v1.4.0
 
   ┌────────────────────────────────┐
   │  File: prompt.txt  (18 tokens) │

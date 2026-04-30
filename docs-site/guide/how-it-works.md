@@ -44,7 +44,7 @@ Rules are organized into three modules:
 | Module | Rules |
 |--------|-------|
 | `rules/security.py` | `prompt-injection`, `jailbreak-pattern`, `secret-in-prompt`, `pii-in-prompt`, `context-injection-boundary` |
-| `rules/quality.py` | `structure-sections`, `role-clarity`, `output-format-missing`, `hallucination-risk`, `clarity-vague-terms`, `specificity-*`, `politeness-bloat`, `verbosity-*`, `actionability-*`, `consistency-*`, `completeness-*` |
+| `rules/quality.py` | `structure-sections`, `role-clarity`, `output-format-missing`, `output-length-missing`, `hallucination-risk`, `clarity-vague-terms`, `specificity-*`, `politeness-bloat`, `verbosity-*`, `actionability-*`, `consistency-*`, `completeness-*` |
 | `rules/cost.py` | `cost`, `cost-limit` |
 
 Each rule receives the full prompt text and configuration, then returns a (possibly empty) list of `Finding` objects.

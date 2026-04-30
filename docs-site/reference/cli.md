@@ -57,7 +57,7 @@ promptlint --file prompt.txt --format sarif > results.sarif
 **JSON output structure:**
 ```json
 {
-  "version": "1.3.0",
+  "version": "1.4.0",
   "file": "prompt.txt",
   "token_count": 97,
   "score": 72,

@@ -15,7 +15,7 @@ The one exception: if you use the tiktoken-based token counter (`pip install "pr
 | Token counting | Exact (tiktoken) | Heuristic (chars ÷ 4, ±15%) |
 | Auto-fix | ✅ | ✅ |
 | SARIF output | ✅ | ✅ |
-| Rule coverage | 20 rules | 20 rules |
+| Rule coverage | 21 rules | 21 rules |
 | Speed | ~100ms startup | ~80ms startup |
 
 Use Python if you care about exact token counts and cost projections. Use Node.js if you're in a JavaScript/TypeScript environment. For CI/CD, both work equally well — use the GitHub Action which wraps the Node.js CLI.
