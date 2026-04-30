@@ -15,7 +15,7 @@ PromptLint makes these problems visible before they ship.
 
 ## What It Checks
 
-PromptLint runs **20 rules** across five categories:
+PromptLint runs **21 rules** across five categories:
 
 | Category | What it catches |
 |----------|----------------|
@@ -64,5 +64,5 @@ PromptLint ships as four separate packages from the same codebase:
 ## Next Steps
 
 - [Install and run your first lint →](/guide/getting-started)
-- [Browse all 20 rules →](/rules/)
+- [Browse all 21 rules →](/rules/)
 - [Set up GitHub Actions integration →](/integrations/github-actions)

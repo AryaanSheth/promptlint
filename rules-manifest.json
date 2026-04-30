@@ -17,6 +17,7 @@
     "jailbreak-pattern",
     "role-clarity",
     "output-format-missing",
+    "output-length-missing",
     "pii-in-prompt",
     "secret-in-prompt",
     "hallucination-risk",

@@ -15,7 +15,7 @@ export default defineConfig({
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:locale', content: 'en' }],
     ['meta', { property: 'og:title', content: 'PromptLint — Lint your LLM prompts' }],
-    ['meta', { property: 'og:description', content: 'Catch cost waste, security risks, PII leaks, and quality issues in your AI prompts before they reach production. 20 rules, 5 auto-fixes, zero API calls.' }],
+    ['meta', { property: 'og:description', content: 'Catch cost waste, security risks, PII leaks, and quality issues in your AI prompts before they reach production. 21 rules, 5 auto-fixes, zero API calls.' }],
     ['meta', { property: 'og:site_name', content: 'PromptLint Docs' }],
   ],
 
@@ -28,7 +28,7 @@ export default defineConfig({
       { text: 'Reference', link: '/reference/cli', activeMatch: '/reference/' },
       { text: 'Integrations', link: '/integrations/github-actions', activeMatch: '/integrations/' },
       {
-        text: 'v1.3.0',
+        text: 'v1.4.0',
         items: [
           { text: 'Changelog', link: '/changelog' },
           { text: 'Contributing', link: 'https://github.com/AryaanSheth/promptlint/blob/main/CONTRIBUTING.md' },
@@ -94,6 +94,7 @@ export default defineConfig({
             { text: 'structure-sections', link: '/rules/structure-sections' },
             { text: 'role-clarity', link: '/rules/role-clarity' },
             { text: 'output-format-missing', link: '/rules/output-format-missing' },
+            { text: 'output-length-missing', link: '/rules/output-length-missing' },
             { text: 'hallucination-risk', link: '/rules/hallucination-risk' },
           ],
         },

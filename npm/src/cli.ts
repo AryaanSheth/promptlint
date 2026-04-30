@@ -1,11 +1,13 @@
 #!/usr/bin/env node
+import * as crypto from "crypto";
 import * as fs from "fs";
+import * as os from "os";
 import * as path from "path";
 import { loadConfig, STARTER_CONFIG } from "./config";
-import { analyze, applyFixes } from "./engine";
+import { analyze, applyFixes, computeScore } from "./engine";
 import type { Finding } from "./rules/cost";
 
-const VERSION = "1.0.0";
+const VERSION = "1.4.0";
 const MAX_INPUT_BYTES = 10 * 1024 * 1024; // 10 MB
 
 // ── ANSI color helpers ───────────────────────────────────────────────────
@@ -33,11 +35,16 @@ interface Args {
   fix: boolean;
   failLevel: "none" | "warn" | "critical";
   showDashboard: boolean;
+  showScore: boolean;
+  badge: boolean;
   quiet: boolean;
   exclude: string[];
   listRules: boolean;
   explain?: string;
   init: boolean;
+  installHooks: boolean;
+  compare?: [string, string];
+  updateBaseline: boolean;
   version: boolean;
   help: boolean;
 }
@@ -50,10 +57,14 @@ function parseArgs(argv: string[]): Args {
     fix: false,
     failLevel: "critical",
     showDashboard: false,
+    showScore: false,
+    badge: false,
     quiet: false,
     exclude: [],
     listRules: false,
     init: false,
+    installHooks: false,
+    updateBaseline: false,
     version: false,
     help: false,
   };
@@ -94,6 +105,12 @@ function parseArgs(argv: string[]): Args {
       case "--show-dashboard":
         args.showDashboard = true;
         break;
+      case "--show-score":
+        args.showScore = true;
+        break;
+      case "--badge":
+        args.badge = true;
+        break;
       case "-q":
       case "--quiet":
         args.quiet = true;
@@ -109,6 +126,15 @@ function parseArgs(argv: string[]): Args {
         break;
       case "--init":
         args.init = true;
+        break;
+      case "--install-hooks":
+        args.installHooks = true;
+        break;
+      case "--compare":
+        args.compare = [argv[++i], argv[++i]];
+        break;
+      case "--update-baseline":
+        args.updateBaseline = true;
         break;
       default:
         if (!arg.startsWith("-")) args.files.push(arg);
@@ -137,8 +163,13 @@ ${bold("Options:")}
       --fix                  Apply auto-fixes and print optimised prompt
       --fail-level <level>   Exit non-zero at: none | warn | critical (default: critical)
       --show-dashboard       Show token savings breakdown
+      --show-score           Show prompt health score (0-100) and grade
+      --badge                Output a Shields.io badge URL for the health score
   -q, --quiet                Summary only (CI mode)
       --exclude <glob>       Glob pattern to exclude (repeatable)
+      --compare <a> <b>      Compare two prompt files by health score
+      --update-baseline      Write current findings to .promptlintbaseline
+      --install-hooks        Install a pre-commit git hook
       --list-rules           Show all rules
       --explain <rule-id>    Explain a specific rule
       --init                 Create starter .promptlintrc
@@ -147,19 +178,27 @@ ${bold("Options:")}
 `;
 
 const ALL_RULES = [
-  { id: "cost",                     category: "Cost",     severity: "INFO",     fix: false, desc: "Reports token count and estimated API cost." },
-  { id: "cost-limit",               category: "Cost",     severity: "WARN",     fix: false, desc: "Warns when prompt exceeds configured token limit." },
-  { id: "prompt-injection",         category: "Security", severity: "CRITICAL", fix: true,  desc: "Detects prompt injection patterns (incl. obfuscated)." },
-  { id: "structure-sections",       category: "Structure",severity: "WARN",     fix: true,  desc: "Warns when prompt has no explicit sections." },
-  { id: "clarity-vague-terms",      category: "Quality",  severity: "WARN",     fix: false, desc: "Flags vague quantifiers and uncertain language." },
-  { id: "specificity-examples",     category: "Quality",  severity: "INFO",     fix: false, desc: "Suggests adding examples to instruction prompts." },
-  { id: "specificity-constraints",  category: "Quality",  severity: "INFO",     fix: false, desc: "Suggests adding constraints for clearer output." },
-  { id: "politeness-bloat",         category: "Quality",  severity: "WARN",     fix: true,  desc: "Flags polite filler words that waste tokens." },
-  { id: "verbosity-sentence-length",category: "Quality",  severity: "INFO",     fix: false, desc: "Flags sentences with more than 40 words." },
-  { id: "verbosity-redundancy",     category: "Quality",  severity: "INFO",     fix: true,  desc: "Flags verbose phrases with simpler alternatives." },
-  { id: "actionability-weak-verbs", category: "Quality",  severity: "INFO",     fix: false, desc: "Flags excessive passive voice." },
-  { id: "consistency-terminology",  category: "Quality",  severity: "INFO",     fix: false, desc: "Flags mixed synonymous terms." },
-  { id: "completeness-edge-cases",  category: "Quality",  severity: "INFO",     fix: false, desc: "Suggests specifying edge-case handling." },
+  { id: "cost",                      category: "Cost",       severity: "INFO",     fix: false, desc: "Reports token count and estimated API cost." },
+  { id: "cost-limit",                category: "Cost",       severity: "WARN",     fix: false, desc: "Warns when prompt exceeds configured token limit." },
+  { id: "prompt-injection",          category: "Security",   severity: "CRITICAL", fix: true,  desc: "Detects prompt injection patterns (incl. obfuscated)." },
+  { id: "jailbreak-pattern",         category: "Security",   severity: "CRITICAL", fix: true,  desc: "Detects roleplay/hypothetical jailbreak patterns." },
+  { id: "pii-in-prompt",             category: "Security",   severity: "WARN",     fix: false, desc: "Detects emails, SSNs, phone numbers and credit cards." },
+  { id: "secret-in-prompt",          category: "Security",   severity: "CRITICAL", fix: false, desc: "Detects API keys, tokens and credentials." },
+  { id: "context-injection-boundary",category: "Security",   severity: "WARN",     fix: false, desc: "Detects template vars not enclosed by structural delimiters." },
+  { id: "structure-sections",        category: "Structure",  severity: "WARN",     fix: true,  desc: "Warns when prompt has no explicit sections." },
+  { id: "clarity-vague-terms",       category: "Quality",    severity: "WARN",     fix: false, desc: "Flags vague quantifiers and uncertain language." },
+  { id: "specificity-examples",      category: "Quality",    severity: "INFO",     fix: false, desc: "Suggests adding examples to instruction prompts." },
+  { id: "specificity-constraints",   category: "Quality",    severity: "INFO",     fix: false, desc: "Suggests adding constraints for clearer output." },
+  { id: "politeness-bloat",          category: "Quality",    severity: "WARN",     fix: true,  desc: "Flags polite filler words that waste tokens." },
+  { id: "verbosity-sentence-length", category: "Quality",    severity: "INFO",     fix: false, desc: "Flags sentences with more than 40 words." },
+  { id: "verbosity-redundancy",      category: "Quality",    severity: "INFO",     fix: true,  desc: "Flags verbose phrases with simpler alternatives." },
+  { id: "actionability-weak-verbs",  category: "Quality",    severity: "INFO",     fix: false, desc: "Flags excessive passive voice." },
+  { id: "consistency-terminology",   category: "Quality",    severity: "INFO",     fix: false, desc: "Flags mixed synonymous terms." },
+  { id: "completeness-edge-cases",   category: "Quality",    severity: "INFO",     fix: false, desc: "Suggests specifying edge-case handling." },
+  { id: "role-clarity",              category: "Quality",    severity: "WARN",     fix: false, desc: "Flags instructional prompts missing a role/persona definition." },
+  { id: "output-format-missing",     category: "Quality",    severity: "WARN",     fix: false, desc: "Detects output instructions without a format spec." },
+  { id: "output-length-missing",     category: "Quality",    severity: "INFO",     fix: false, desc: "Detects output instructions without a length constraint." },
+  { id: "hallucination-risk",        category: "Quality",    severity: "WARN",     fix: false, desc: "Flags prompts requesting current facts without grounding." },
 ];
 
 function cmdListRules(): void {
@@ -211,6 +250,163 @@ function cmdInit(): void {
   fs.writeFileSync(dest, STARTER_CONFIG, "utf8");
   console.log(green("Created .promptlintrc") + " with default settings.");
   console.log(dim("→") + " Example configs for common use cases: " + cyan("https://docs.promptlint.dev/guide/config-examples"));
+}
+
+function cmdInstallHooks(): void {
+  const gitDir = path.join(process.cwd(), ".git");
+  if (!fs.existsSync(gitDir) || !fs.statSync(gitDir).isDirectory()) {
+    console.error(red("Not inside a git repository."));
+    process.exit(1);
+  }
+  const hooksDir = path.join(gitDir, "hooks");
+  if (!fs.existsSync(hooksDir)) fs.mkdirSync(hooksDir, { recursive: true });
+  const hookPath = path.join(hooksDir, "pre-commit");
+  if (fs.existsSync(hookPath)) {
+    console.error(yellow("pre-commit hook already exists. Remove it first to reinstall."));
+    process.exit(1);
+  }
+  const script = [
+    "#!/bin/sh",
+    "# Added by: promptlint --install-hooks",
+    "# Lints staged .txt / .md / .prompt files before each commit.",
+    "staged=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\\.(txt|md|prompt)$')",
+    "if [ -n \"$staged\" ]; then",
+    "  promptlint $staged --fail-level critical",
+    "fi",
+    "",
+  ].join(os.EOL);
+  fs.writeFileSync(hookPath, script, { encoding: "utf8", mode: 0o755 });
+  console.log(green("Installed pre-commit hook") + ` → ${hookPath}`);
+  console.log(dim("Staged .txt/.md/.prompt files will be linted before each commit."));
+}
+
+// ── Message-array input parsing ──────────────────────────────────────────
+
+function parseMessageText(text: string): string {
+  const stripped = text.trim();
+  if (!(stripped.startsWith("[") && stripped.endsWith("]"))) return text;
+  try {
+    const msgs = JSON.parse(stripped);
+    if (!Array.isArray(msgs)) return text;
+    if (!msgs.every((m: unknown) => typeof m === "object" && m !== null && "content" in (m as object))) return text;
+    const parts = (msgs as Array<{ content: unknown }>)
+      .map((m) => String(m.content ?? "").trim())
+      .filter(Boolean);
+    return parts.length ? parts.join("\n\n") : text;
+  } catch {
+    return text;
+  }
+}
+
+// ── Baseline fingerprint helpers ─────────────────────────────────────────
+
+const BASELINE_FILE = path.join(process.cwd(), ".promptlintbaseline");
+
+function fingerprint(r: Finding): string {
+  const key = `${r.rule}|${r.line}|${(r.message ?? "").slice(0, 60)}`;
+  return crypto.createHash("md5").update(key).digest("hex").slice(0, 12);
+}
+
+function loadBaseline(): Set<string> {
+  try {
+    if (!fs.existsSync(BASELINE_FILE)) return new Set();
+    const data = JSON.parse(fs.readFileSync(BASELINE_FILE, "utf8")) as { fingerprints?: string[] };
+    return new Set(data.fingerprints ?? []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveBaseline(results: Finding[]): void {
+  const fps = [...new Set(results.map(fingerprint))].sort();
+  fs.writeFileSync(
+    BASELINE_FILE,
+    JSON.stringify({ version: 1, fingerprints: fps, count: fps.length }, null, 2),
+    "utf8",
+  );
+}
+
+function filterBaseline(results: Finding[], baseline: Set<string>): Finding[] {
+  return results.filter((r) => !baseline.has(fingerprint(r)));
+}
+
+// ── Score rendering ──────────────────────────────────────────────────────
+
+function renderScore(score: ReturnType<typeof computeScore>): void {
+  const g = score.grade;
+  const gradeColor = g === "A" ? green : g === "B" ? cyan : g === "C" ? yellow : red;
+  console.log(bold("\nPrompt Health Score"));
+  console.log(`Overall: ${bold(gradeColor(`${score.overall}/100 (${g})`))}`)  ;
+  const cats = score.categories;
+  console.log(`  Security:     ${cats.security}`);
+  console.log(`  Cost:         ${cats.cost}`);
+  console.log(`  Quality:      ${cats.quality}`);
+  console.log(`  Completeness: ${cats.completeness}`);
+}
+
+function renderBadge(score: ReturnType<typeof computeScore>): void {
+  const o = score.overall;
+  const badgeColor =
+    o >= 90 ? "brightgreen" :
+    o >= 75 ? "green" :
+    o >= 60 ? "yellow" :
+    o >= 45 ? "orange" : "red";
+  const label = `promptlint%3A${o}%2F100%20(${score.grade})`;
+  const url = `https://img.shields.io/badge/${label}-${badgeColor}`;
+  console.log(`\n${cyan("Badge URL:")} ${url}`);
+  console.log(`${dim("Markdown:")}  ![PromptLint Score](${url})`);
+}
+
+// ── Compare command ──────────────────────────────────────────────────────
+
+function cmdCompare(fileA: string, fileB: string, configPath: string | undefined, fmt: string): void {
+  for (const fp of [fileA, fileB]) {
+    if (!fs.existsSync(fp)) {
+      console.error(red(`File not found: ${fp}`));
+      process.exit(1);
+    }
+  }
+  const config = loadConfig(configPath);
+  const textA = fs.readFileSync(fileA, "utf8");
+  const textB = fs.readFileSync(fileB, "utf8");
+  const rA = analyze(textA, config);
+  const rB = analyze(textB, config);
+  const sA = computeScore(rA);
+  const sB = computeScore(rB);
+  const deltaOverall = sB.overall - sA.overall;
+
+  if (fmt === "json") {
+    console.log(JSON.stringify({
+      file_a: { path: fileA, score: sA, findings: rA.length },
+      file_b: { path: fileB, score: sB, findings: rB.length },
+      delta: {
+        overall: deltaOverall,
+        security: sB.categories.security - sA.categories.security,
+        cost: sB.categories.cost - sA.categories.cost,
+        quality: sB.categories.quality - sA.categories.quality,
+        completeness: sB.categories.completeness - sA.categories.completeness,
+      },
+    }, null, 2));
+    return;
+  }
+
+  const fmtDelta = (d: number) =>
+    d > 0 ? green(`+${d}`) : d < 0 ? red(`${d}`) : dim("0");
+
+  console.log(`\n${bold("Compare:")} ${fileA}  vs  ${fileB}`);
+  console.log(`  Overall:      ${sA.overall} → ${sB.overall}  (${fmtDelta(deltaOverall)})`);
+  for (const cat of ["security", "cost", "quality", "completeness"] as const) {
+    const d = sB.categories[cat] - sA.categories[cat];
+    console.log(`  ${(cat.charAt(0).toUpperCase() + cat.slice(1)).padEnd(14)}${sA.categories[cat]} → ${sB.categories[cat]}  (${fmtDelta(d)})`);
+  }
+  console.log(`  Findings:     ${rA.length} → ${rB.length}`);
+
+  if (deltaOverall > 0)
+    console.log(`\n${green(`${path.basename(fileB)} scores higher (+${deltaOverall} pts)`)}`);
+  else if (deltaOverall < 0)
+    console.log(`\n${red(`${path.basename(fileB)} scores lower (${deltaOverall} pts)`)}`);
+  else
+    console.log(`\n${dim("Scores are identical.")}`);
 }
 
 // ── Inline-disable support ───────────────────────────────────────────────
@@ -284,11 +480,22 @@ function maxSeverity(results: Finding[]): number {
 function runLintOnText(
   text: string,
   configPath: string | undefined,
-  opts: { fix: boolean; showDashboard: boolean; format: string; quiet: boolean; label?: string }
+  opts: {
+    fix: boolean;
+    showDashboard: boolean;
+    showScore: boolean;
+    badge: boolean;
+    format: string;
+    quiet: boolean;
+    label?: string;
+    baseline?: Set<string>;
+  }
 ): Finding[] {
+  text = parseMessageText(text);
   const config = loadConfig(configPath);
   let results = analyze(text, config);
   results = filterDisabled(results, text);
+  if (opts.baseline?.size) results = filterBaseline(results, opts.baseline);
 
   let tokens = 0;
   for (const r of results) {
@@ -331,6 +538,7 @@ function runLintOnText(
     };
     if (opts.label) payload.file = opts.label;
     if (opts.showDashboard) payload.dashboard = dashboard;
+    if (opts.showScore) payload.score = computeScore(results);
     console.log(JSON.stringify(payload, null, 2));
   } else {
     if (opts.label && !opts.quiet) console.log(`\n${bold(`File: ${opts.label}`)}`);
@@ -338,6 +546,11 @@ function runLintOnText(
     if (opts.showDashboard && !opts.quiet) {
       console.log("");
       renderDashboard(tokens, optimizedTokens, config.costPer1kTokens, config.callsPerDay);
+    }
+    if (opts.showScore && !opts.quiet) {
+      const score = computeScore(results);
+      renderScore(score);
+      if (opts.badge) renderBadge(score);
     }
     if (optimizedPrompt !== undefined && !opts.quiet) {
       console.log(bold("Optimised Prompt"));
@@ -470,6 +683,14 @@ async function main(): Promise<void> {
     cmdInit();
     return;
   }
+  if (args.installHooks) {
+    cmdInstallHooks();
+    return;
+  }
+  if (args.compare) {
+    cmdCompare(args.compare[0], args.compare[1], args.config, args.format);
+    return;
+  }
 
   const resolvedFiles = resolveFiles(args.files, args.exclude);
 
@@ -495,11 +716,16 @@ async function main(): Promise<void> {
     return;
   }
 
+  const baseline = args.updateBaseline ? new Set<string>() : loadBaseline();
+
   const opts = {
     fix: args.fix,
     showDashboard: args.showDashboard,
+    showScore: args.showScore,
+    badge: args.badge,
     format: args.format,
     quiet: args.quiet,
+    baseline,
   };
 
   const t0 = Date.now();
@@ -507,8 +733,8 @@ async function main(): Promise<void> {
 
   if (resolvedFiles.length) {
     for (const fp of resolvedFiles) {
-      const stat = fs.statSync(fp);
-      if (stat.size > MAX_INPUT_BYTES) {
+      const fstat = fs.statSync(fp);
+      if (fstat.size > MAX_INPUT_BYTES) {
         console.error(red(`Skipping ${fp}: exceeds 10 MB safety limit.`));
         continue;
       }
@@ -522,6 +748,12 @@ async function main(): Promise<void> {
       ? args.text.replace(/\\n/g, "\n")
       : await readStdin();
     allResults.push(...runLintOnText(text, args.config, opts));
+  }
+
+  if (args.updateBaseline) {
+    saveBaseline(allResults);
+    console.log(green("Baseline updated") + ` → ${BASELINE_FILE} (${allResults.length} fingerprint(s))`);
+    return;
   }
 
   const elapsed = ((Date.now() - t0) / 1000).toFixed(2);

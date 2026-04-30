@@ -57,6 +57,7 @@ rules:
   structure_sections: true
   role_clarity: true
   output_format_missing: true
+  output_length_missing: true
   hallucination_risk: true
 
   # Quality
@@ -248,6 +249,9 @@ rules:
   structure_sections: true
   role_clarity: true
   output_format_missing: true
+  output_length_missing:
+    enabled: true
+    level: warn
   hallucination_risk: true
   clarity_vague_terms: true
   specificity_examples:

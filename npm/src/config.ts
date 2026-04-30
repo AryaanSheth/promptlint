@@ -50,6 +50,7 @@ const DEFAULTS: PromptlintConfig = {
     "completeness-edge-cases": true,
     "role-clarity": true,
     "output-format-missing": true,
+    "output-length-missing": true,
     "hallucination-risk": true,
   },
   injectionPatterns: [
@@ -279,6 +280,8 @@ rules:
   role_clarity:
     enabled: true
   output_format_missing:
+    enabled: true
+  output_length_missing:
     enabled: true
   hallucination_risk:
     enabled: true

@@ -2,6 +2,31 @@
 
 All notable changes to PromptLint are documented here.
 
+## v1.4.0
+
+**Released:** April 2026
+
+### New Rule
+- `output-length-missing` — INFO-level completeness rule that fires when a prompt contains a task verb (`write`, `generate`, `list`, etc.) but no length constraint (word count, sentence limit, brevity directive). Total: **21 rules**, **5 auto-fixable**.
+
+### New CLI Features
+
+| Flag | Description |
+|------|-------------|
+| `--show-score` | Display health score (0–100) + letter grade (A–F) and per-category breakdown |
+| `--badge` | Output a Shields.io badge URL + markdown snippet for the health score |
+| `--compare FILE_A FILE_B` | Lint two prompts and show score delta per category — useful for validating rewrites |
+| `--update-baseline` | Write current findings to `.promptlintbaseline`; future runs suppress known issues |
+| `--install-hooks` | Install a pre-commit git hook that lints staged `.txt`/`.md`/`.prompt` files |
+
+### Improvements
+- **Message array input** — both CLIs now accept OpenAI/Anthropic `[{role, content}…]` JSON arrays via `--text` or stdin; `content` fields are joined and linted as a single prompt
+- **TS autofix parity** — `verbosity-redundancy` auto-fix expanded from 7 to 41 replacement patterns to match the Python implementation
+- Docs site redesigned to match the main landing page (black/green terminal aesthetic, JetBrains Mono, film grain overlay)
+- New [Config Examples](/guide/config-examples) page with 10 ready-to-copy `.promptlintrc` starters for common use cases
+
+---
+
 ## v1.3.0
 
 **Released:** 2024

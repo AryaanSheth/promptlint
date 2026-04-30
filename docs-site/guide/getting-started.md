@@ -34,7 +34,7 @@ Verify the installation:
 
 ```bash
 promptlint --version
-# PromptLint v1.3.0
+# PromptLint v1.4.0
 ```
 
 ## Step 2 — Lint Your First Prompt
@@ -57,7 +57,7 @@ promptlint --file prompt.txt
 You should see output like this:
 
 ```
-  PromptLint v1.3.0
+  PromptLint v1.4.0
 
   ┌────────────────────────────────┐
   │  File: prompt.txt  (18 tokens) │
@@ -156,10 +156,21 @@ Or use the CLI in any CI environment:
 promptlint --file prompts/*.txt --fail-level warn --format json
 ```
 
+## Step 7 — Health Score & Badge
+
+See how your prompt scores across security, cost, quality, and completeness:
+
+```bash
+promptlint --file prompt.txt --show-score --badge
+```
+
+Output includes a letter grade (A–F), per-category scores, and a Shields.io badge URL you can paste into your README.
+
 ## What's Next
 
 - [Installation details for all platforms →](/guide/installation)
 - [Full configuration reference →](/reference/configuration)
-- [All 20 rules explained →](/rules/)
+- [All 21 rules explained →](/rules/)
 - [GitHub Actions integration →](/integrations/github-actions)
 - [Best practices for writing prompts →](/guide/best-practices)
+- [Config examples for common use cases →](/guide/config-examples)

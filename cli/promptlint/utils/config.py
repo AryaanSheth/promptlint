@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 
 @dataclass
@@ -38,6 +38,7 @@ class PromptlintConfig:
             "completeness-edge-cases": True,
             "role-clarity": True,
             "output-format-missing": True,
+            "output-length-missing": True,
             "hallucination-risk": True,
         }
     )

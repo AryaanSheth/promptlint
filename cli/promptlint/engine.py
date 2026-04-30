@@ -9,6 +9,7 @@ from .rules.quality import (
     check_consistency,
     check_hallucination_risk,
     check_output_format,
+    check_output_length,
     check_politeness,
     check_role_clarity,
     check_specificity,
@@ -45,6 +46,7 @@ class LintEngine:
         results.extend(check_completeness(text, self.config))
         results.extend(check_role_clarity(text, self.config))
         results.extend(check_output_format(text, self.config))
+        results.extend(check_output_length(text, self.config))
         results.extend(check_hallucination_risk(text, self.config))
         results.extend(check_politeness(text, self.config))
 
@@ -64,7 +66,8 @@ _SECURITY_RULES = frozenset({
 _COST_RULES = frozenset({"cost", "cost-limit", "politeness-bloat"})
 _COMPLETENESS_RULES = frozenset({
     "completeness-edge-cases", "role-clarity", "output-format-missing",
-    "hallucination-risk", "specificity-examples", "specificity-constraints",
+    "output-length-missing", "hallucination-risk", "specificity-examples",
+    "specificity-constraints",
 })
 _QUALITY_RULES = frozenset({
     "clarity-vague-terms", "verbosity-sentence-length", "verbosity-redundancy",

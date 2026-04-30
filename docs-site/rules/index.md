@@ -1,6 +1,6 @@
 # Rules Overview
 
-PromptLint ships **20 rules** covering security, cost, structure, and quality. Every rule can be individually enabled, disabled, or have its severity overridden.
+PromptLint ships **21 rules** covering security, cost, structure, and quality. Every rule can be individually enabled, disabled, or have its severity overridden.
 
 ## All Rules
 
@@ -16,6 +16,7 @@ PromptLint ships **20 rules** covering security, cost, structure, and quality. E
 | [`structure-sections`](/rules/structure-sections) | WARN | ✅ | 🏗️ Structure |
 | [`role-clarity`](/rules/role-clarity) | WARN | — | 🏗️ Structure |
 | [`output-format-missing`](/rules/output-format-missing) | WARN | — | 🏗️ Structure |
+| [`output-length-missing`](/rules/output-length-missing) | INFO | — | 🏗️ Structure |
 | [`hallucination-risk`](/rules/hallucination-risk) | WARN | — | 🏗️ Structure |
 | [`clarity-vague-terms`](/rules/clarity-vague-terms) | WARN | — | ✨ Quality |
 | [`specificity-examples`](/rules/specificity-examples) | INFO | — | 🎯 Specificity |
@@ -55,6 +56,7 @@ The five security rules fire at **CRITICAL** severity by default. They should ne
 | [`structure-sections`](/rules/structure-sections) | No task / context / output sections detected |
 | [`role-clarity`](/rules/role-clarity) | No role or persona defined for the model |
 | [`output-format-missing`](/rules/output-format-missing) | No output format specification |
+| [`output-length-missing`](/rules/output-length-missing) | No output length constraint (word count, sentence limit, etc.) |
 | [`hallucination-risk`](/rules/hallucination-risk) | Patterns that increase hallucination likelihood |
 
 ### ✨ Quality {#quality}

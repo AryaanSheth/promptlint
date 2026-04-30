@@ -244,6 +244,21 @@ _RULES: List[RuleMeta] = [
         ),
     ),
     RuleMeta(
+        id="output-length-missing",
+        category="Quality: Completeness",
+        default_severity="INFO",
+        fixable=False,
+        short="Detect output instructions without a length constraint.",
+        long=(
+            "Fires when the prompt contains a task verb (write, create,\n"
+            "generate, list, etc.) but no length constraint (e.g. '200 words',\n"
+            "'max 3 sentences', 'be concise').  Without a length constraint\n"
+            "model response length varies widely across calls.\n\n"
+            "Fix: add a word/token/sentence count or a brevity directive such\n"
+            "as 'Keep the response under 100 words.' or 'in 3 bullet points'."
+        ),
+    ),
+    RuleMeta(
         id="pii-in-prompt",
         category="Security",
         default_severity="WARN",

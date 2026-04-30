@@ -175,10 +175,11 @@ Exit codes: `0` = clean, `1` = warnings (with `--fail-level warn`), `2` = critic
 | `pii-in-prompt` | CRITICAL | SSNs, credit cards, emails, phone numbers | — |
 | `context-injection-boundary` | CRITICAL | Unsanitized user content injected into system prompts | — |
 | `cost` | INFO | Token count and per-call cost estimate | — |
-| `cost-limit` | WARN | Exceeds your configured token budget | — |
+| `cost-limit` | CRITICAL | Exceeds your configured token budget | — |
 | `structure-sections` | WARN | No clear Task/Context/Output sections | yes |
 | `role-clarity` | WARN | No system role defined | — |
 | `output-format-missing` | WARN | No output format specified | — |
+| `output-length-missing` | INFO | Task verb present but no length constraint specified | — |
 | `hallucination-risk` | WARN | Asks model to recall facts without grounding | — |
 | `clarity-vague-terms` | WARN | "some", "stuff", "maybe", "various" | — |
 | `specificity-examples` | INFO | No examples provided for complex instructions | — |
@@ -255,11 +256,16 @@ promptlint [FILES...] [OPTIONS]
 
   -V, --version            Show version
   -f, --file PATH          Single prompt file
-  -t, --text TEXT          Inline prompt text
+  -t, --text TEXT          Inline prompt text (or OpenAI/Anthropic messages JSON)
   -c, --config PATH        Config file (default: .promptlintrc)
-  --format {text,json}     Output format
+  --format {text,json,sarif}  Output format
   --fix                    Auto-fix and print optimized prompt
   --fail-level LEVEL       none / warn / critical (default: critical)
+  --show-score             Health score 0-100 with letter grade
+  --badge                  Output Shields.io badge URL (requires --show-score)
+  --compare A B            Compare two prompts by score
+  --update-baseline        Write findings to .promptlintbaseline; future runs skip known issues
+  --install-hooks          Install pre-commit git hook
   --show-dashboard         Token savings breakdown
   -q, --quiet              Summary line only (for CI)
   --exclude PATTERN        Exclude globs (repeatable)

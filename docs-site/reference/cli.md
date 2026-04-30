@@ -57,7 +57,7 @@ promptlint --file prompt.txt --format sarif > results.sarif
 **JSON output structure:**
 ```json
 {
-  "version": "1.3.0",
+  "version": "1.4.0",
   "file": "prompt.txt",
   "token_count": 97,
   "score": 72,
@@ -87,12 +87,36 @@ Display a cost savings dashboard after linting.
 promptlint --file prompt.txt --show-dashboard
 ```
 
-### `--no-color`
+### `--show-score`
 
-Disable ANSI color codes (useful for logging).
+Display a prompt health score (0–100) with a letter grade and per-category breakdown.
 
 ```bash
-promptlint --file prompt.txt --no-color
+promptlint --file prompt.txt --show-score
+```
+
+Example output:
+```
+Prompt Health Score
+Overall: 78/100 (B)
+  Security:     100
+  Cost:         90
+  Quality:      65
+  Completeness: 70
+```
+
+### `--badge`
+
+Output a Shields.io badge URL for the prompt health score. Requires `--show-score`.
+
+```bash
+promptlint --file prompt.txt --show-score --badge
+```
+
+Example output:
+```
+Badge URL: https://img.shields.io/badge/promptlint%3A78%2F100%20(B)-green
+Markdown:  ![PromptLint Score](https://img.shields.io/badge/...)
 ```
 
 ## Fix Options
@@ -108,17 +132,58 @@ promptlint --file prompt.txt --fix > prompt_fixed.txt
 
 See the [Auto-Fix guide](/guide/auto-fix) for details.
 
+## Baseline Options
+
+### `--update-baseline`
+
+Write the current set of findings to `.promptlintbaseline`. On subsequent runs, findings already in the baseline are silently suppressed. Useful for brownfield codebases where you want to fix new issues without being blocked by pre-existing ones.
+
+```bash
+# Capture all current issues as "known"
+promptlint --file "prompts/**/*.txt" --update-baseline
+
+# Future runs only report NEW issues
+promptlint --file "prompts/**/*.txt"
+```
+
+The baseline file is a JSON fingerprint list and is safe to commit to git. Delete it to reset.
+
+## Comparison
+
+### `--compare FILE_A FILE_B`
+
+Lint two prompt files and show a side-by-side score comparison with deltas for each category.
+
+```bash
+promptlint --compare prompt_v1.txt prompt_v2.txt
+```
+
+Example output:
+```
+Compare: prompt_v1.txt  vs  prompt_v2.txt
+  Overall:      62 → 78  (+16)
+  Security:     100 → 100  (0)
+  Cost:         80 → 90   (+10)
+  Quality:      50 → 65   (+15)
+  Completeness: 60 → 70   (+10)
+  Findings:     12 → 7
+
+prompt_v2.txt scores higher (+16 pts)
+```
+
+Also works with `--format json` for pipeline integration.
+
 ## Exit Code Options
 
 ### `--fail-level LEVEL`
 
-**Values:** `critical` (default), `warn`, `info`, `none`
+**Values:** `critical` (default), `warn`, `none`
 
 Set the minimum severity that causes a non-zero exit code.
 
 ```bash
 promptlint --file prompt.txt --fail-level warn   # exit 1 on WARN+
-promptlint --file prompt.txt --fail-level info   # exit 1 on any finding
+promptlint --file prompt.txt --fail-level critical  # exit 2 on CRITICAL
 promptlint --file prompt.txt --fail-level none   # always exit 0
 ```
 
@@ -132,13 +197,31 @@ Use a specific config file instead of searching for `.promptlintrc`.
 promptlint --file prompt.txt --config /path/to/security.yaml
 ```
 
-### `--rule RULE_ID`
+### `--init`
 
-Run only a specific rule.
+Generate a starter `.promptlintrc` in the current directory with all defaults documented.
 
 ```bash
-promptlint --file prompt.txt --rule prompt-injection
-promptlint --file prompt.txt --rule cost
+promptlint --init
+```
+
+## Setup Commands
+
+### `--install-hooks`
+
+Install a pre-commit git hook that automatically lints staged `.txt`, `.md`, and `.prompt` files before each commit.
+
+```bash
+promptlint --install-hooks
+```
+
+Creates `.git/hooks/pre-commit` with:
+```sh
+#!/bin/sh
+staged=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(txt|md|prompt)$')
+if [ -n "$staged" ]; then
+  promptlint $staged --fail-level critical
+fi
 ```
 
 ## Information Commands
@@ -158,6 +241,7 @@ Print detailed documentation for a rule.
 ```bash
 promptlint --explain prompt-injection
 promptlint --explain pii-in-prompt
+promptlint --explain output-length-missing
 ```
 
 ### `--version`
@@ -166,8 +250,25 @@ Print version and exit.
 
 ```bash
 promptlint --version
-# PromptLint v1.3.0
 ```
+
+## Message Array Input
+
+PromptLint accepts OpenAI/Anthropic-style messages arrays directly as stdin or `--text` input. The content fields are concatenated and linted as a single prompt.
+
+```bash
+cat messages.json | promptlint
+```
+
+Where `messages.json` contains:
+```json
+[
+  {"role": "system", "content": "You are a helpful assistant."},
+  {"role": "user", "content": "Write a summary of the document."}
+]
+```
+
+PromptLint joins the `content` values and lints the combined text.
 
 ## Complete Options Table
 
@@ -178,33 +279,49 @@ promptlint --version
 | `--format` | — | `text` | Output format: `text`, `json`, `sarif` |
 | `--fix` | — | off | Auto-fix and print to stdout |
 | `--show-dashboard` | — | off | Show cost savings dashboard |
+| `--show-score` | — | off | Show health score (0-100) and grade |
+| `--badge` | — | off | Output Shields.io badge URL |
 | `--fail-level` | — | `critical` | Minimum severity for non-zero exit |
 | `--config` | — | `.promptlintrc` | Config file path |
-| `--rule` | — | all | Run only this rule |
-| `--no-color` | — | off | Disable ANSI color |
+| `--init` | — | — | Create starter `.promptlintrc` |
+| `--update-baseline` | — | off | Write findings to `.promptlintbaseline` |
+| `--compare A B` | — | — | Compare two files by score |
+| `--install-hooks` | — | — | Install pre-commit git hook |
 | `--list-rules` | — | — | List all rules and exit |
 | `--explain` | — | — | Explain a rule and exit |
-| `--version` | — | — | Print version and exit |
+| `--quiet` | `-q` | off | Suppress findings; summary only |
+| `--exclude` | — | — | Glob pattern to exclude (repeatable) |
+| `--version` | `-V` | — | Print version and exit |
+| `--help` | `-h` | — | Show help |
 
 ## Common Recipes
 
 ```bash
 # Lint everything under prompts/
-promptlint --file "prompts/**/*.txt"
+promptlint "prompts/**/*.txt"
 
 # CI — fail on any warning
-promptlint --file "prompts/**/*.txt" --fail-level warn --format json
+promptlint "prompts/**/*.txt" --fail-level warn --format json
 
 # Fix and review diff
-promptlint --file prompt.txt --fix > fixed.txt && diff prompt.txt fixed.txt
+promptlint prompt.txt --fix > fixed.txt && diff prompt.txt fixed.txt
 
-# Security-only scan
-promptlint --file prompt.txt --rule prompt-injection
-promptlint --file prompt.txt --rule pii-in-prompt
+# Get health score with badge URL
+promptlint prompt.txt --show-score --badge
+
+# Compare prompt versions
+promptlint --compare prompt_v1.txt prompt_v2.txt
+
+# Suppress known issues (brownfield adoption)
+promptlint "prompts/**/*.txt" --update-baseline
+promptlint "prompts/**/*.txt"  # only new issues
+
+# Lint messages.json (API format)
+cat messages.json | promptlint
 
 # Pipe through jq for CI integration
-promptlint --file "prompts/**/*.txt" --format json | jq '.findings[] | select(.level == "CRITICAL")'
+promptlint "prompts/**/*.txt" --format json | jq '.findings[] | select(.level == "CRITICAL")'
 
 # SARIF for GitHub Security tab
-promptlint --file "prompts/**/*.txt" --format sarif > results.sarif
+promptlint "prompts/**/*.txt" --format sarif > results.sarif
 ```
