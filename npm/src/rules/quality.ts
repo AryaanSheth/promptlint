@@ -377,3 +377,22 @@ export function checkHallucinationRisk(text: string, config: PromptlintConfig): 
   }
   return [];
 }
+
+// ── Rule 2.7: Output length missing ───────────────────────────────────────
+
+const OUTPUT_LENGTH_TASK_VERBS = /\b(write|create|implement|build|generate|list|extract|return|output|summarize|describe|explain|produce|draft|compose)\b/i;
+const OUTPUT_LENGTH_CONSTRAINT = /(\b\d+\s*(?:words?|tokens?|characters?|chars?|sentences?|paragraphs?)\b|\bmax(?:imum)?\s*(?:words?|tokens?|characters?|length)\b|\b(?:word|token|character|char|length)\s*limit\b|\b(?:short|brief|concise|succinct|terse)\b|\b(?:no\s+more\s+than|no\s+longer\s+than|at\s+most|up\s+to)\s+\d+|\bkeep\s+it\s+(?:short|brief|concise|under)\b|\btruncate\b|\blimit(?:ed)?\s+to\s+\d+|\bin\s+\d+\s+(?:sentences?|points?|bullet\s+points?))/i;
+
+export function checkOutputLength(text: string, config: PromptlintConfig): Finding[] {
+  if (!(config.enabledRules["output-length-missing"] ?? true)) return [];
+  if (text.length < 80) return [];
+  if (!OUTPUT_LENGTH_TASK_VERBS.test(text)) return [];
+  if (OUTPUT_LENGTH_CONSTRAINT.test(text)) return [];
+  return [{
+    level: "INFO",
+    rule: "output-length-missing",
+    message: "No output length constraint specified. Add a word/token/sentence limit for consistent response lengths.",
+    line: "-",
+    context: preview(text, config.previewLength),
+  }];
+}

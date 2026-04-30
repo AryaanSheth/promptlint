@@ -38,6 +38,7 @@ class PromptlintConfig:
             "completeness-edge-cases": True,
             "role-clarity": True,
             "output-format-missing": True,
+            "output-length-missing": True,
             "hallucination-risk": True,
         }
     )

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 import re
+import stat
 import sys
 import time
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Set
 
 from rich.console import Console
 
@@ -90,6 +93,8 @@ rules:
     enabled: true
   output_format_missing:
     enabled: true
+  output_length_missing:
+    enabled: true
   pii_in_prompt:
     enabled: true
     check_email: true
@@ -111,6 +116,60 @@ fix:
   verbosity_redundancy: true
   structure_scaffold: true
 """
+
+# ── Message-array input parsing ────────────────────────────────────────
+
+
+def _parse_message_text(text: str) -> str:
+    """If text is a JSON messages array ([{role, content}...]), join content fields."""
+    stripped = text.strip()
+    if not (stripped.startswith("[") and stripped.endswith("]")):
+        return text
+    try:
+        msgs = json.loads(stripped)
+    except json.JSONDecodeError:
+        return text
+    if not isinstance(msgs, list):
+        return text
+    if not all(isinstance(m, dict) and "content" in m for m in msgs):
+        return text
+    parts = [str(m["content"]) for m in msgs if str(m.get("content", "")).strip()]
+    return "\n\n".join(parts) if parts else text
+
+
+# ── Baseline fingerprint helpers ────────────────────────────────────────
+
+_BASELINE_FILE = Path(".promptlintbaseline")
+
+
+def _fingerprint(r: dict) -> str:
+    rule = r.get("rule", "")
+    line = str(r.get("line", "-"))
+    msg = r.get("message", "")[:60]
+    return hashlib.md5(f"{rule}|{line}|{msg}".encode()).hexdigest()[:12]
+
+
+def _load_baseline(path: Path) -> Set[str]:
+    if not path.exists():
+        return set()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return set(data.get("fingerprints", []))
+    except Exception:
+        return set()
+
+
+def _save_baseline(path: Path, results: list) -> None:
+    fps = sorted({_fingerprint(r) for r in results})
+    path.write_text(
+        json.dumps({"version": 1, "fingerprints": fps, "count": len(fps)}, indent=2),
+        encoding="utf-8",
+    )
+
+
+def _filter_baseline(results: list, baseline: Set[str]) -> list:
+    return [r for r in results if _fingerprint(r) not in baseline]
+
 
 # ── Inline-ignore support ──────────────────────────────────────────────
 
@@ -169,15 +228,20 @@ def _run_lint_on_text(
     fix: bool,
     show_dashboard: bool,
     show_score: bool = False,
+    show_badge: bool = False,
     output_format: str,
     quiet: bool,
     label: Optional[str] = None,
+    baseline: Optional[Set[str]] = None,
 ) -> list[dict]:
     """Lint *prompt_text* and return the list of findings."""
 
+    prompt_text = _parse_message_text(prompt_text)
     engine = LintEngine(config_data)
     results = engine.analyze(prompt_text)
     results = _filter_disabled(results, prompt_text)
+    if baseline:
+        results = _filter_baseline(results, baseline)
 
     tokens = 0
     for r in results:
@@ -247,7 +311,10 @@ def _run_lint_on_text(
                 config_data.calls_per_day,
             )
         if show_score and not quiet:
-            _render_score(compute_score(results))
+            score = compute_score(results)
+            _render_score(score)
+            if show_badge:
+                _render_badge(score)
         if optimized_prompt is not None and not quiet:
             console.print("Optimized Prompt")
             console.print(optimized_prompt)
@@ -267,10 +334,16 @@ def _run_lint(
     fail_level: str,
     show_dashboard: bool,
     show_score: bool,
+    show_badge: bool,
+    update_baseline: bool,
     quiet: bool,
 ) -> None:
     config_data = load_config(config)
     t0 = time.time()
+
+    baseline: Set[str] = set()
+    if not update_baseline:
+        baseline = _load_baseline(_BASELINE_FILE)
 
     all_results: list[dict] = []
     sarif_file_map: dict[str, list[dict]] = {}
@@ -291,9 +364,11 @@ def _run_lint(
                 fix=fix,
                 show_dashboard=show_dashboard,
                 show_score=show_score,
+                show_badge=show_badge,
                 output_format=inner_format,
                 quiet=quiet or output_format == "sarif",
                 label=str(fp) if len(files) > 1 else None,
+                baseline=baseline,
             )
             all_results.extend(results)
             if output_format == "sarif":
@@ -306,12 +381,22 @@ def _run_lint(
             fix=fix,
             show_dashboard=show_dashboard,
             show_score=show_score,
+            show_badge=show_badge,
             output_format=inner_format,
             quiet=quiet or output_format == "sarif",
+            baseline=baseline,
         )
         all_results.extend(results)
         if output_format == "sarif":
             sarif_file_map["<stdin>"] = results
+
+    if update_baseline:
+        _save_baseline(_BASELINE_FILE, all_results)
+        console.print(
+            f"[green]Baseline updated[/green] → {_BASELINE_FILE} "
+            f"({len(all_results)} fingerprint(s))"
+        )
+        return
 
     elapsed = time.time() - t0
 
@@ -376,6 +461,122 @@ def _cmd_init() -> None:
         "[dim]→[/dim] Example configs for common use cases: "
         "[cyan]https://docs.promptlint.dev/guide/config-examples[/cyan]"
     )
+
+
+# ── --compare command ──────────────────────────────────────────────────
+
+
+def _cmd_compare(
+    file_a: Path,
+    file_b: Path,
+    config_path: Optional[Path],
+    fmt: str,
+) -> None:
+    config = load_config(config_path)
+    engine = LintEngine(config)
+
+    text_a = file_a.read_text(encoding="utf-8")
+    text_b = file_b.read_text(encoding="utf-8")
+    r_a = engine.analyze(text_a)
+    r_b = engine.analyze(text_b)
+
+    s_a = compute_score(r_a)
+    s_b = compute_score(r_b)
+
+    delta_overall = s_b["overall"] - s_a["overall"]
+    delta_cats = {
+        k: s_b["categories"][k] - s_a["categories"][k]
+        for k in s_a["categories"]
+    }
+
+    if fmt == "json":
+        print(json.dumps({
+            "file_a": {"path": str(file_a), "score": s_a, "findings": len(r_a)},
+            "file_b": {"path": str(file_b), "score": s_b, "findings": len(r_b)},
+            "delta": {"overall": delta_overall, **delta_cats},
+        }, indent=2))
+        return
+
+    def _fmt_delta(d: int) -> str:
+        if d > 0:
+            return f"[green]+{d}[/green]"
+        if d < 0:
+            return f"[red]{d}[/red]"
+        return "[dim]0[/dim]"
+
+    console.print(f"\n[bold]Compare:[/bold] {file_a}  vs  {file_b}")
+    console.print(f"  Overall:      {s_a['overall']} → {s_b['overall']}  ({_fmt_delta(delta_overall)})")
+    for cat, d in delta_cats.items():
+        va = s_a["categories"][cat]
+        vb = s_b["categories"][cat]
+        console.print(f"  {cat.capitalize():<14}{va} → {vb}  ({_fmt_delta(d)})")
+    console.print(f"  Findings:     {len(r_a)} → {len(r_b)}")
+
+    if delta_overall > 0:
+        console.print(f"\n[green]{file_b.name} scores higher (+{delta_overall} pts)[/green]")
+    elif delta_overall < 0:
+        console.print(f"\n[red]{file_b.name} scores lower ({delta_overall} pts)[/red]")
+    else:
+        console.print("\n[dim]Scores are identical.[/dim]")
+
+
+# ── install-hooks command ───────────────────────────────────────────────
+
+_PRE_COMMIT_HOOK = """\
+#!/bin/sh
+# Added by: promptlint --install-hooks
+# Lints staged .txt / .md / .prompt files before each commit.
+staged=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\\.(txt|md|prompt)$')
+if [ -n "$staged" ]; then
+  promptlint $staged --fail-level critical
+fi
+"""
+
+
+def _cmd_install_hooks() -> None:
+    git_dir = Path(".git")
+    if not git_dir.is_dir():
+        console.print("[red]Not inside a git repository.[/red]")
+        sys.exit(1)
+
+    hooks_dir = git_dir / "hooks"
+    hooks_dir.mkdir(exist_ok=True)
+    hook_path = hooks_dir / "pre-commit"
+
+    if hook_path.exists():
+        console.print(
+            "[yellow]pre-commit hook already exists.[/yellow] "
+            "Remove it first to reinstall."
+        )
+        sys.exit(1)
+
+    hook_path.write_text(_PRE_COMMIT_HOOK, encoding="utf-8")
+    current = stat.S_IMODE(os.stat(hook_path).st_mode)
+    os.chmod(hook_path, current | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    console.print(f"[green]Installed pre-commit hook[/green] → {hook_path}")
+    console.print("[dim]Staged .txt/.md/.prompt files will be linted before each commit.[/dim]")
+
+
+# ── --badge helper ─────────────────────────────────────────────────────
+
+
+def _render_badge(score: dict) -> None:
+    overall = score["overall"]
+    grade = score.get("grade", "?")
+    if overall >= 90:
+        badge_color = "brightgreen"
+    elif overall >= 75:
+        badge_color = "green"
+    elif overall >= 60:
+        badge_color = "yellow"
+    elif overall >= 45:
+        badge_color = "orange"
+    else:
+        badge_color = "red"
+    label = f"promptlint%3A{overall}%2F100%20({grade})"
+    url = f"https://img.shields.io/badge/{label}-{badge_color}"
+    console.print(f"\n[cyan]Badge URL:[/cyan] {url}")
+    console.print(f"[dim]Markdown:[/dim]  ![PromptLint Score]({url})")
 
 
 # ── Argument parser ─────────────────────────────────────────────────────
@@ -456,6 +657,27 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Generate a starter .promptlintrc in the current directory.",
     )
+    parser.add_argument(
+        "--install-hooks",
+        action="store_true",
+        help="Install a pre-commit git hook that runs promptlint on staged files.",
+    )
+    parser.add_argument(
+        "--compare",
+        nargs=2,
+        metavar=("FILE_A", "FILE_B"),
+        help="Compare two prompt files by health score and show deltas.",
+    )
+    parser.add_argument(
+        "--update-baseline",
+        action="store_true",
+        help="Write current findings to .promptlintbaseline (suppress known issues).",
+    )
+    parser.add_argument(
+        "--badge",
+        action="store_true",
+        help="Output a Shields.io badge URL for the prompt health score.",
+    )
 
     return parser
 
@@ -477,6 +699,18 @@ def main() -> None:
 
     if args.init:
         _cmd_init()
+        return
+
+    if args.install_hooks:
+        _cmd_install_hooks()
+        return
+
+    if args.compare:
+        file_a, file_b = Path(args.compare[0]), Path(args.compare[1])
+        for fp in (file_a, file_b):
+            if not fp.exists():
+                parser.error(f"File not found: {fp}")
+        _cmd_compare(file_a, file_b, args.config, args.format)
         return
 
     resolved_files = _resolve_files(args.files, args.file, args.exclude)
@@ -501,6 +735,8 @@ def main() -> None:
             fail_level=args.fail_level,
             show_dashboard=args.show_dashboard,
             show_score=args.show_score,
+            show_badge=args.badge,
+            update_baseline=args.update_baseline,
             quiet=args.quiet,
         )
     except (ValueError, UnicodeDecodeError, OSError) as exc:

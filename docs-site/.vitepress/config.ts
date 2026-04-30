@@ -94,6 +94,7 @@ export default defineConfig({
             { text: 'structure-sections', link: '/rules/structure-sections' },
             { text: 'role-clarity', link: '/rules/role-clarity' },
             { text: 'output-format-missing', link: '/rules/output-format-missing' },
+            { text: 'output-length-missing', link: '/rules/output-length-missing' },
             { text: 'hallucination-risk', link: '/rules/hallucination-risk' },
           ],
         },

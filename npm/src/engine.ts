@@ -18,6 +18,7 @@ import {
   checkCompleteness,
   checkRoleClarity,
   checkOutputFormat,
+  checkOutputLength,
   checkHallucinationRisk,
 } from "./rules/quality";
 import { lineNumber, lineContext } from "./rules/utils";
@@ -42,6 +43,7 @@ export function analyze(text: string, config: PromptlintConfig): Finding[] {
   results.push(...checkCompleteness(text, config));
   results.push(...checkRoleClarity(text, config));
   results.push(...checkOutputFormat(text, config));
+  results.push(...checkOutputLength(text, config));
   results.push(...checkHallucinationRisk(text, config));
   results.push(...checkPoliteness(text, config));
 
@@ -148,6 +150,7 @@ function applyPolitenessFix(text: string, words: string[]): string {
 
 function fixRedundancy(text: string): string {
   const replacements: [RegExp, string][] = [
+    // Prepositions & connectives
     [/\bin order to\b/gi, "to"],
     [/\bdue to the fact that\b/gi, "because"],
     [/\bat this point in time\b/gi, "now"],
@@ -155,6 +158,43 @@ function fixRedundancy(text: string): string {
     [/\bin the event that\b/gi, "if"],
     [/\bprior to\b/gi, "before"],
     [/\bsubsequent to\b/gi, "after"],
+    [/\bwith the exception of\b/gi, "except"],
+    [/\bin close proximity to\b/gi, "near"],
+    [/\bin spite of the fact that\b/gi, "although"],
+    [/\bwith regard to\b/gi, "about"],
+    [/\bin relation to\b/gi, "about"],
+    [/\bfor the reason that\b/gi, "because"],
+    [/\buntil such time as\b/gi, "until"],
+    // Time expressions
+    [/\bin the near future\b/gi, "soon"],
+    [/\bat the present time\b/gi, "now"],
+    [/\bon a (daily|weekly|monthly) basis\b/gi, "$1"],
+    // Redundant pairs
+    [/\ba total of\b/gi, ""],
+    [/\beach and every\b/gi, "every"],
+    [/\bfirst and foremost\b/gi, "first"],
+    [/\bfuture plans\b/gi, "plans"],
+    [/\bpast history\b/gi, "history"],
+    [/\bend result\b/gi, "result"],
+    [/\bbasic fundamentals\b/gi, "fundamentals"],
+    [/\bclose proximity\b/gi, "proximity"],
+    [/\bunexpected surprise\b/gi, "surprise"],
+    [/\bcompletely eliminate\b/gi, "eliminate"],
+    [/\bcompletely finished\b/gi, "finished"],
+    [/\badvance planning\b/gi, "planning"],
+    [/\bpast experience\b/gi, "experience"],
+    [/\bnew innovation\b/gi, "innovation"],
+    [/\bpersonal opinion\b/gi, "opinion"],
+    [/\brepeat again\b/gi, "repeat"],
+    [/\bstill remains\b/gi, "remains"],
+    [/\btrue fact\b/gi, "fact"],
+    // Wordy verb phrases
+    [/\bhas the ability to\b/gi, "can"],
+    [/\bis able to\b/gi, "can"],
+    [/\bgather together\b/gi, "gather"],
+    [/\bjoin together\b/gi, "join"],
+    [/\brefer back\b/gi, "refer"],
+    [/\breturn back\b/gi, "return"],
   ];
   let out = text;
   for (const [re, repl] of replacements) out = out.replace(re, repl);
@@ -223,6 +263,7 @@ export const RULE_IDS: readonly string[] = [
   "jailbreak-pattern",
   "role-clarity",
   "output-format-missing",
+  "output-length-missing",
   "pii-in-prompt",
   "secret-in-prompt",
   "hallucination-risk",
@@ -238,7 +279,8 @@ const SECURITY_RULES = new Set([
 const COST_RULES = new Set(["cost", "cost-limit", "politeness-bloat"]);
 const COMPLETENESS_RULES = new Set([
   "completeness-edge-cases", "role-clarity", "output-format-missing",
-  "hallucination-risk", "specificity-examples", "specificity-constraints",
+  "output-length-missing", "hallucination-risk", "specificity-examples",
+  "specificity-constraints",
 ]);
 const QUALITY_RULES = new Set([
   "clarity-vague-terms", "verbosity-sentence-length", "verbosity-redundancy",

@@ -466,6 +466,50 @@ def check_hallucination_risk(text: str, config: PromptlintConfig) -> List[Dict[s
     return []
 
 
+# ── Output length missing ─────────────────────────────────────────────────
+
+_OUTPUT_LENGTH_TASK_VERBS = re.compile(
+    r"\b(write|create|implement|build|generate|list|extract|return|output"
+    r"|summarize|describe|explain|produce|draft|compose)\b",
+    re.IGNORECASE,
+)
+_OUTPUT_LENGTH_CONSTRAINT_RE = re.compile(
+    r"(\b\d+\s*(?:words?|tokens?|characters?|chars?|sentences?|paragraphs?)\b"
+    r"|\bmax(?:imum)?\s*(?:words?|tokens?|characters?|length)\b"
+    r"|\b(?:word|token|character|char|length)\s*limit\b"
+    r"|\b(?:short|brief|concise|succinct|terse)\b"
+    r"|\b(?:no\s+more\s+than|no\s+longer\s+than|at\s+most|up\s+to)\s+\d+"
+    r"|\bkeep\s+it\s+(?:short|brief|concise|under)\b"
+    r"|\btruncate\b"
+    r"|\blimit(?:ed)?\s+to\s+\d+"
+    r"|\bin\s+\d+\s+(?:sentences?|points?|bullet\s+points?))",
+    re.IGNORECASE,
+)
+
+
+def check_output_length(text: str, config: PromptlintConfig) -> List[Dict[str, object]]:
+    if not config.enabled_rules.get("output-length-missing", True):
+        return []
+    if len(text) < 80:
+        return []
+    if not _OUTPUT_LENGTH_TASK_VERBS.search(text):
+        return []
+    if _OUTPUT_LENGTH_CONSTRAINT_RE.search(text):
+        return []
+    return [
+        {
+            "level": "INFO",
+            "rule": "output-length-missing",
+            "message": (
+                "No output length constraint specified. "
+                "Add a word/token/sentence limit for consistent response lengths."
+            ),
+            "line": "-",
+            "context": _preview(text, config.preview_length),
+        }
+    ]
+
+
 def check_politeness(text: str, config: PromptlintConfig) -> List[Dict[str, object]]:
     results: List[Dict[str, object]] = []
 
