@@ -146,7 +146,7 @@ def _fingerprint(r: dict) -> str:
     rule = r.get("rule", "")
     line = str(r.get("line", "-"))
     msg = r.get("message", "")[:60]
-    return hashlib.md5(f"{rule}|{line}|{msg}".encode()).hexdigest()[:12]
+    return hashlib.md5(f"{rule}|{line}|{msg}".encode(), usedforsecurity=False).hexdigest()[:12]
 
 
 def _load_baseline(path: Path) -> Set[str]:
